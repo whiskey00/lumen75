@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Tray version of the F75 logo: just the letters, big and bold, on a transparent
+       background so they stay readable at 16-24 px next to other tray icons. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff1493"/>
+      <stop offset="0.55" stop-color="#ff2a2a"/>
+      <stop offset="1" stop-color="#ff7a00"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#g)" stroke="#0b0c10" stroke-width="28" stroke-linejoin="round" paint-order="stroke">
+    <!-- F -->
+    <path d="M60 232 h270 v116 h-146 v86 h124 v110 h-124 v248 h-124 z"/>
+    <!-- 7 -->
+    <path d="M360 232 h290 v112 l-154 448 h-136 l150 -440 h-150 z"/>
+    <!-- 5 -->
+    <path d="M684 232 h280 v116 h-160 v74 h52 a185 185 0 0 1 0 370 h-172 v-116 h160 a69 69 0 0 0 0 -138 h-160 z"/>
+  </g>
+</svg>

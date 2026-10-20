@@ -69,7 +69,10 @@ cd src-tauri && cargo test
 The tests check packets against values captured from a real keyboard, round-trip the factory
 macro byte for byte, and parse a real backup.
 
-The icon is `app-icon.svg`. Regenerate every size with `npx tauri icon app-icon.svg`.
+The icon is `app-icon.svg`; regenerate every size with `npx tauri icon app-icon.svg`. The tray uses
+`tray-icon.svg` (just the letters, readable at 16-24 px), rendered to `src-tauri/icons/tray*.png`.
+
+Installers: `npm run tauri build` puts an MSI and an NSIS setup in `src-tauri/target/release/bundle/`.
 
 ## Credits
 

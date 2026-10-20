@@ -241,8 +241,10 @@ fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
     let sep = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open, &anim_item, &sep, &quit_item])?;
     *app.state::<AppState>().tray_anim.lock().unwrap() = Some(anim_item);
+    // A tray-sized version of the logo (tray-icon.svg): the full app icon is a blur at 16-24 px.
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?;
     TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().cloned().expect("app icon"))
+        .icon(icon)
         .tooltip("AULA Studio")
         .menu(&menu)
         .show_menu_on_left_click(false)
