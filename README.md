@@ -22,6 +22,12 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07`). Wi
   with gain, smoothness, colourful or one colour, and a choice of output device. Audio is
   captured with WASAPI loopback, so no microphone is needed. Frames stream with the real-time
   command `0x88`, about 14 a second over 2.4G. Nothing is stored on the keyboard.
+- **Animations**: Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7,
+  with presets), plus speed, brightness and direction. The F75's own multicolour effects use a
+  fixed rainbow that ignores the colour palettes (tested), so these stream from the app like the
+  audio lighting. They pause when the computer is idle, so the keyboard can sleep.
+- **Tray and Start with Windows**: closing the window keeps the app in the tray (Open,
+  Animation on/off, Quit). Autostart starts it hidden and resumes your last animation.
 - **Device**: side light, knob mode, OS mode, Windows-key lock and sleep timer. Battery level
   (experimental).
 - **Backup / restore**: same hex files as `aula backup` / `aula restore`, so backups work with
@@ -42,6 +48,9 @@ Close the official AULA app first. It uses the same channel, and the app warns w
   talks to the keyboard while no key is held. Otherwise the keyboard can drop a key release.
 - `audio.rs`: loopback capture (cpal), FFT bands with automatic level, the modes, and colour
   groups that fit the 126-byte frame budget.
+- `anim.rs`: the animations as functions of time, in fixed bands so frames stay small and
+  smooth; the streaming thread with idle pause.
+- `app.rs`: saved settings, tray, autostart, single instance.
 - `macros.rs`, `keymap.rs`: macro store format, step parser, key layout and HID usages.
 
 ## Develop
@@ -59,6 +68,8 @@ cd src-tauri && cargo test
 
 The tests check packets against values captured from a real keyboard, round-trip the factory
 macro byte for byte, and parse a real backup.
+
+The icon is `app-icon.svg`. Regenerate every size with `npx tauri icon app-icon.svg`.
 
 ## Credits
 

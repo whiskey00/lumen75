@@ -370,17 +370,7 @@ pub mod run {
                 };
                 let levels = analyzer.update(&buf, &s).to_vec();
                 let groups = render(&leds, &levels, &s, started.elapsed().as_secs_f32());
-                let sent = encode(&groups).map_err(|e| e.0).and_then(|frame| {
-                    let mut guard = kb.lock().map_err(|_| "keyboard lock poisoned".to_string())?;
-                    if guard.is_none() {
-                        *guard = Some(open().map_err(|e| e.0)?);
-                    }
-                    let r = guard.as_mut().unwrap().send_live(&frame);
-                    if r.is_err() {
-                        *guard = None;
-                    }
-                    r.map_err(|e| e.0)
-                });
+                let sent = encode(&groups).map_err(|e| e.0).and_then(|frame| crate::device::send_frame(&kb, open, &frame));
                 match sent {
                     Ok(()) => failures = 0,
                     Err(e) => {

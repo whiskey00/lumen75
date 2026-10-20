@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2029"/>
+      <stop offset="1" stop-color="#0a0b0f"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff1493"/>
+      <stop offset="0.5" stop-color="#ff2a2a"/>
+      <stop offset="1" stop-color="#ff7a00"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c303a"/>
+      <stop offset="1" stop-color="#1c1f26"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a4f5c"/>
+      <stop offset="1" stop-color="#363a44"/>
+    </linearGradient>
+    <filter id="blur" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
+
+  <!-- tile -->
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#tile)"/>
+  <rect x="33" y="33" width="958" height="958" rx="215" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="2"/>
+
+  <!-- RGB underglow -->
+  <rect x="170" y="560" width="684" height="90" rx="45" fill="url(#glow)" opacity="0.85" filter="url(#blur)"/>
+
+  <!-- keyboard body -->
+  <rect x="140" y="250" width="744" height="380" rx="58" fill="url(#body)" stroke="#454a56" stroke-width="6"/>
+  <!-- light strip along the bottom edge -->
+  <rect x="190" y="606" width="644" height="10" rx="5" fill="url(#glow)"/>
+
+  <!-- knob (the F75's top-right dial) -->
+  <circle cx="800" cy="320" r="44" fill="#3d424d" stroke="#5c6270" stroke-width="6"/>
+  <circle cx="800" cy="320" r="30" fill="#2a2e37"/>
+  <rect x="796" y="284" width="8" height="22" rx="4" fill="#ff5a2a"/>
+
+  <!-- keys: top row (Esc + F keys) -->
+  <g fill="url(#cap)">
+    <rect x="186" y="292" width="58" height="56" rx="12"/>
+    <rect x="272" y="292" width="58" height="56" rx="12"/>
+    <rect x="340" y="292" width="58" height="56" rx="12"/>
+    <rect x="408" y="292" width="58" height="56" rx="12"/>
+    <rect x="494" y="292" width="58" height="56" rx="12"/>
+    <rect x="562" y="292" width="58" height="56" rx="12"/>
+    <rect x="630" y="292" width="58" height="56" rx="12"/>
+    <!-- row 2 -->
+    <rect x="186" y="370" width="58" height="56" rx="12"/>
+    <rect x="254" y="370" width="58" height="56" rx="12"/>
+    <rect x="322" y="370" width="58" height="56" rx="12"/>
+    <rect x="390" y="370" width="58" height="56" rx="12"/>
+    <rect x="458" y="370" width="58" height="56" rx="12"/>
+    <rect x="526" y="370" width="58" height="56" rx="12"/>
+    <rect x="594" y="370" width="58" height="56" rx="12"/>
+    <rect x="662" y="370" width="104" height="56" rx="12"/>
+    <rect x="780" y="370" width="58" height="56" rx="12"/>
+    <!-- row 3 -->
+    <rect x="186" y="448" width="88" height="56" rx="12"/>
+    <rect x="284" y="448" width="58" height="56" rx="12"/>
+    <rect x="352" y="448" width="58" height="56" rx="12"/>
+    <rect x="420" y="448" width="58" height="56" rx="12"/>
+    <rect x="488" y="448" width="58" height="56" rx="12"/>
+    <rect x="556" y="448" width="58" height="56" rx="12"/>
+    <rect x="624" y="448" width="142" height="56" rx="12"/>
+    <rect x="780" y="448" width="58" height="56" rx="12"/>
+    <!-- bottom row with space bar and arrows -->
+    <rect x="186" y="526" width="70" height="56" rx="12"/>
+    <rect x="266" y="526" width="70" height="56" rx="12"/>
+    <rect x="346" y="526" width="250" height="56" rx="12"/>
+    <rect x="606" y="526" width="70" height="56" rx="12"/>
+  </g>
+  <!-- arrow cluster, lit -->
+  <g fill="url(#glow)">
+    <rect x="712" y="526" width="58" height="56" rx="12" opacity="0.95"/>
+    <rect x="780" y="526" width="58" height="56" rx="12" opacity="0.95"/>
+  </g>
+  <!-- a few lit keys (WASD-ish) -->
+  <rect x="322" y="370" width="58" height="56" rx="12" fill="#ff2a5f" opacity="0.9"/>
+  <rect x="284" y="448" width="58" height="56" rx="12" fill="#ff1493" opacity="0.9"/>
+  <rect x="352" y="448" width="58" height="56" rx="12" fill="#ff3a2a" opacity="0.9"/>
+  <rect x="420" y="448" width="58" height="56" rx="12" fill="#ff6a00" opacity="0.9"/>
+
+  <!-- "F75" drawn as shapes -->
+  <g fill="url(#glow)">
+    <!-- F -->
+    <path d="M330 716 h112 v36 h-72 v32 h60 v34 h-60 v62 h-40 z"/>
+    <!-- 7 -->
+    <path d="M462 716 h120 v34 l-62 130 h-44 l60 -128 h-74 z"/>
+    <!-- 5 -->
+    <path d="M604 716 h112 v36 h-74 v26 h40 a46 46 0 0 1 0 92 h-78 v-36 h74 a12 12 0 0 0 0 -24 h-74 z"/>
+  </g>
+</svg>

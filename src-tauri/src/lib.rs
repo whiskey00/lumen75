@@ -1,3 +1,6 @@
+pub mod anim;
+#[cfg(windows)]
+mod app;
 pub mod audio;
 pub mod device;
 pub mod keymap;
@@ -128,14 +131,20 @@ struct DeviceInfoView {
 // ------------------------------------------------------------ keyboard access
 
 #[derive(Default)]
-struct AppState {
-    kb: Arc<Mutex<Option<Keyboard>>>,
+pub(crate) struct AppState {
+    pub(crate) kb: Arc<Mutex<Option<Keyboard>>>,
     #[cfg(windows)]
-    audio: Mutex<Option<audio::run::Handle>>,
+    pub(crate) audio: Mutex<Option<audio::run::Handle>>,
+    #[cfg(windows)]
+    pub(crate) anim: Mutex<Option<anim::run::Handle>>,
+    #[cfg(windows)]
+    pub(crate) config: Mutex<app::AppConfig>,
+    #[cfg(windows)]
+    pub(crate) tray_anim: Mutex<Option<tauri::menu::CheckMenuItem<tauri::Wry>>>,
 }
 
 #[cfg(windows)]
-fn open_keyboard() -> Result<Keyboard> {
+pub(crate) fn open_keyboard() -> Result<Keyboard> {
     if win::vendor_app_running() {
         return derr("The official AULA app (OemDrv.exe) is running. Quit it first (also from the tray): it uses the same channel.");
     }
@@ -603,6 +612,11 @@ fn audio_start(app: tauri::AppHandle, state: tauri::State<'_, AppState>, setting
     if win::vendor_app_running() {
         return Err("The official AULA app (OemDrv.exe) is running. Quit it first (also from the tray).".into());
     }
+    // only one thing can stream frames at a time: the audio lighting replaces an animation
+    // (stopped without forgetting it, so it comes back with the app)
+    if state.anim.lock().map(|a| a.is_some()).unwrap_or(false) {
+        app::stop_animation(&app, true);
+    }
     let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, move |ev| {
         let _ = match ev {
             audio::run::Event::Frame(f) => app.emit("audio-frame", f),
@@ -662,12 +676,26 @@ fn audio_running(state: tauri::State<'_, AppState>) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // a second launch (e.g. from the Start menu while it runs in the tray) shows this one;
+        // two copies would fight over the keyboard
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| app::show_window(app)))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![app::MINIMIZED_ARG]),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .setup(|app| Ok(app::setup(app.handle())?))
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                app::on_close_requested(window, api);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             catalog, status, read_all, read_battery, set_effect, reset_palette, set_custom, set_device, set_keys,
             reset_keys, save_macro, delete_macro, backup, restore, audio_start, audio_update, audio_stop,
-            audio_running, audio_devices
+            audio_running, audio_devices, app::anim_get, app::anim_start, app::anim_update, app::anim_stop,
+            app::app_settings_get, app::app_settings_set
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

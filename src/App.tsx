@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AudioLines, BatteryFull, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
+import { AudioLines, BatteryFull, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +13,14 @@ import { KeysPage } from "@/pages/keys";
 import { MacrosPage } from "@/pages/macros";
 import { DevicePage } from "@/pages/device";
 import { AudioPage } from "@/pages/audio";
+import { AnimationsPage } from "@/pages/animations";
 
-type Page = "lighting" | "perkey" | "audio" | "keys" | "macros" | "device";
+type Page = "lighting" | "perkey" | "animations" | "audio" | "keys" | "macros" | "device";
 
 const PAGES: { id: Page; label: string; icon: typeof Sun }[] = [
   { id: "lighting", label: "Lighting", icon: Sun },
   { id: "perkey", label: "Per-key", icon: Grid3x3 },
+  { id: "animations", label: "Animations", icon: Sparkles },
   { id: "audio", label: "Audio", icon: AudioLines },
   { id: "keys", label: "Keys", icon: KeyboardIcon },
   { id: "macros", label: "Macros", icon: SquareFunction },
@@ -88,11 +90,14 @@ export default function App() {
   return (
     <div className="bg-background text-foreground flex h-screen">
       <aside className="bg-sidebar flex w-52 shrink-0 flex-col border-r">
-        <div className="px-5 py-5">
-          <div className="text-lg font-semibold tracking-tight">
-            AULA <span className="text-muted-foreground font-normal">Studio</span>
+        <div className="flex items-center gap-3 px-4 py-5">
+          <img src="/logo.svg" alt="" className="size-10 shrink-0" />
+          <div>
+            <div className="text-lg leading-tight font-semibold tracking-tight">
+              AULA <span className="text-muted-foreground font-normal">Studio</span>
+            </div>
+            <div className="text-muted-foreground text-xs">F75</div>
           </div>
-          <div className="text-muted-foreground text-xs">F75</div>
         </div>
         <nav className="grid gap-1 px-3">
           {PAGES.map((p) => (
@@ -170,6 +175,7 @@ export default function App() {
               <>
                 {page === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {page === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {page === "animations" && <AnimationsPage catalog={catalog} />}
                 {page === "audio" && <AudioPage catalog={catalog} />}
                 {page === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {page === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}

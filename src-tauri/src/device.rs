@@ -275,6 +275,25 @@ impl Keyboard {
     }
 }
 
+/// Stream one real-time frame through the shared keyboard, opening it first if needed. On an
+/// error the keyboard is closed, so the next frame opens it again (it may have been switched
+/// off or unplugged). Used by the audio lighting and the animations.
+pub fn send_frame(
+    kb: &std::sync::Mutex<Option<Keyboard>>,
+    open: fn() -> Result<Keyboard>,
+    frame: &[u8],
+) -> std::result::Result<(), String> {
+    let mut guard = kb.lock().map_err(|_| "keyboard lock poisoned".to_string())?;
+    if guard.is_none() {
+        *guard = Some(open().map_err(|e| e.0)?);
+    }
+    let r = guard.as_mut().unwrap().send_live(frame);
+    if r.is_err() {
+        *guard = None;
+    }
+    r.map_err(|e| e.0)
+}
+
 fn check_len(raw: &[u8], len: usize, what: &str) -> Result<()> {
     if raw.len() != len {
         return derr(format!("{what} must be {len} bytes"));

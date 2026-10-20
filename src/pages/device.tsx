@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
-import { api, Board, Catalog } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, AppSettings, Board, Catalog } from "@/lib/api";
 import type { Run } from "@/lib/run";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -151,6 +152,8 @@ export function DevicePage(props: {
         </CardContent>
       </Card>
 
+      <div className="grid content-start gap-4">
+      <AppCard />
       <Card className="self-start">
         <CardHeader>
           <CardTitle>Backup</CardTitle>
@@ -168,7 +171,60 @@ export function DevicePage(props: {
           </Button>
         </CardContent>
       </Card>
+      </div>
     </div>
+  );
+}
+
+const IDLE_CHOICES = [0, 1, 2, 5, 10, 15, 30, 60];
+
+/** App behaviour: start with Windows, keep running in the tray, pause animations when idle. */
+function AppCard() {
+  const [s, setS] = useState<AppSettings | null>(null);
+  useEffect(() => {
+    api.appSettingsGet().then(setS).catch(() => {});
+  }, []);
+  if (!s) return null;
+  const change = async (c: Partial<AppSettings>) => {
+    try {
+      setS(await api.appSettingsSet(c));
+    } catch (e) {
+      toast.error("App setting", { description: String(e) });
+    }
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>App</CardTitle>
+        <CardDescription>Animations and audio lighting run while AULA Studio does.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-5">
+        <Setting label="Start with Windows" help="Starts hidden in the tray and resumes your animation">
+          <Switch checked={s.start_with_windows} onCheckedChange={(v) => change({ start_with_windows: v })} />
+        </Setting>
+        <Separator />
+        <Setting label="Keep running in the tray" help="Closing the window doesn't quit">
+          <Switch checked={s.close_to_tray} onCheckedChange={(v) => change({ close_to_tray: v })} />
+        </Setting>
+        <Separator />
+        <Setting label="Pause animations when idle" help="Lets the keyboard sleep; a key press resumes">
+          <Select value={String(s.idle_pause_minutes)} onValueChange={(v) => change({ idle_pause_minutes: +v })}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[...new Set([...IDLE_CHOICES, s.idle_pause_minutes])]
+                .sort((a, b) => a - b)
+                .map((m) => (
+                  <SelectItem key={m} value={String(m)}>
+                    {m === 0 ? "Never" : `After ${m} min`}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </Setting>
+      </CardContent>
+    </Card>
   );
 }
 

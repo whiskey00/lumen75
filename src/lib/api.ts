@@ -150,7 +150,44 @@ export interface AudioFrame {
   device: string;
 }
 
+export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient";
+export type AnimDirection = "right" | "left" | "up" | "down";
+
+export interface AnimSettings {
+  kind: AnimKind;
+  /** 1-7 colours */
+  colors: Rgb[];
+  /** 0.1 - 3 */
+  speed: number;
+  /** 0.05 - 1 */
+  brightness: number;
+  direction: AnimDirection;
+}
+
+export interface AnimState {
+  running: boolean;
+  settings: AnimSettings;
+}
+
+export interface AnimFrame {
+  keys: [number, Rgb][];
+  /** Paused because the computer is idle. */
+  paused: boolean;
+}
+
+export interface AppSettings {
+  start_with_windows: boolean;
+  close_to_tray: boolean;
+  idle_pause_minutes: number;
+}
+
 export const api = {
+  animGet: () => invoke<AnimState>("anim_get"),
+  animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
+  animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),
+  animStop: () => invoke<AnimState>("anim_stop"),
+  appSettingsGet: () => invoke<AppSettings>("app_settings_get"),
+  appSettingsSet: (change: Partial<AppSettings>) => invoke<AppSettings>("app_settings_set", { change }),
   audioStart: (settings: AudioSettings) => invoke<void>("audio_start", { settings }),
   audioUpdate: (settings: AudioSettings) => invoke<void>("audio_update", { settings }),
   audioStop: () => invoke<void>("audio_stop"),
