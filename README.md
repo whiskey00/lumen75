@@ -19,7 +19,8 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07`). Wi
   keyboard and assigned to a key (run N times, while held, or until a key is pressed). Text is
   typed for the computer's layout (US or Turkish Q).
 - **Audio**: the lights follow whatever the computer plays (Spectrum, Mirror, Ripple, Pulse),
-  with gain, smoothness, colourful or one colour, and a choice of output device. Audio is
+  with gain, smoothness, rainbow or your own colours (1-7), your own saved presets, and a choice
+  of output device. Audio is
   captured with WASAPI loopback, so no microphone is needed. Frames stream with the real-time
   command `0x88`, about 14 a second over 2.4G. Nothing is stored on the keyboard.
 - **Animations**: Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Info, Moon, Plus, Sparkles, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Info, Moon, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
 import { PresetBar } from "@/components/preset-bar";
+import { ColourList, ColourPresets, MAX_COLOURS } from "@/components/colour-list";
 import { cn } from "@/lib/utils";
-import { api, AnimDirection, AnimFrame, AnimKind, AnimSettings, AnimState, Catalog, fromHex, Presets, Rgb, toHex } from "@/lib/api";
+import { api, AnimDirection, AnimFrame, AnimKind, AnimSettings, AnimState, Catalog, Presets, Rgb, toHex } from "@/lib/api";
 
 const KINDS: { id: AnimKind; label: string; help: string }[] = [
   { id: "stream", label: "Stream", help: "Your colours flow across the board" },
@@ -22,16 +23,7 @@ const KINDS: { id: AnimKind; label: string; help: string }[] = [
   { id: "gradient", label: "Gradient", help: "Your colours spread across the board, still" },
 ];
 
-const PRESETS: { name: string; colors: string[] }[] = [
-  { name: "Sunset", colors: ["#ff1493", "#ff0000", "#ff6e00"] },
-  { name: "Ocean", colors: ["#00ffd5", "#0080ff", "#2000ff"] },
-  { name: "Forest", colors: ["#00ff40", "#a0ff00", "#008a20"] },
-  { name: "Synthwave", colors: ["#ff00c8", "#8a00ff", "#00e5ff"] },
-  { name: "Fire", colors: ["#ff0000", "#ff5000", "#ffb000"] },
-  { name: "Ice", colors: ["#ffffff", "#9ad8ff", "#2a7bff"] },
-];
 
-const MAX_COLORS = 7;
 const DIRECTIONS: { id: AnimDirection; icon: typeof ArrowRight }[] = [
   { id: "right", icon: ArrowRight },
   { id: "left", icon: ArrowLeft },
@@ -142,55 +134,11 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Colours</CardTitle>
-            <CardDescription>Up to {MAX_COLORS}. The animation blends from one to the next.</CardDescription>
+            <CardDescription>Up to {MAX_COLOURS}. The animation blends from one to the next.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {s.colors.map((c, i) => (
-                <div key={i} className="group relative">
-                  <input
-                    type="color"
-                    value={toHex(c)}
-                    onChange={(e) => set({ colors: s.colors.map((x, j) => (j === i ? fromHex(e.target.value) : x)) })}
-                    className="h-11 w-14 cursor-pointer rounded-md border bg-transparent"
-                    aria-label={`Colour ${i + 1}`}
-                  />
-                  {s.colors.length > 1 && (
-                    <button
-                      aria-label={`Remove colour ${i + 1}`}
-                      onClick={() => set({ colors: s.colors.filter((_, j) => j !== i) })}
-                      className="bg-background absolute -top-2 -right-2 hidden rounded-full border p-0.5 group-hover:block"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {s.colors.length < MAX_COLORS && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-14"
-                  aria-label="Add a colour"
-                  onClick={() => set({ colors: [...s.colors, s.colors[s.colors.length - 1] ?? [255, 255, 255]] })}
-                >
-                  <Plus />
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground text-sm">Presets:</span>
-              {PRESETS.map((p) => (
-                <Button key={p.name} size="sm" variant="outline" className="gap-2" onClick={() => set({ colors: p.colors.map(fromHex) })}>
-                  <span className="flex">
-                    {p.colors.map((c) => (
-                      <span key={c} className="-ml-1 size-3 rounded-full border border-black/40 first:ml-0" style={{ background: c }} />
-                    ))}
-                  </span>
-                  {p.name}
-                </Button>
-              ))}
-            </div>
+            <ColourList colors={s.colors} onChange={(colors) => set({ colors })} />
+            <ColourPresets onPick={(colors) => set({ colors })} />
             <PresetBar
               title="My presets"
               saves="this animation: its type, colours, speed, brightness and direction"

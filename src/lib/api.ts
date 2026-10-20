@@ -135,8 +135,12 @@ export interface AudioSettings {
   gain: number;
   /** 0 - 9 */
   smoothness: number;
+  /** Rainbow colours; off = your `colors`. */
   colorful: boolean;
+  /** Kept for older saved settings: the first of `colors`. */
   color: Rgb;
+  /** 1-7 colours, spread over the bands (used when not colourful). */
+  colors: Rgb[];
   /** Output device to listen to; null = the Windows default. */
   device: string | null;
 }
@@ -184,13 +188,15 @@ export interface AppSettings {
 export interface Presets {
   animations: { name: string; settings: AnimSettings }[];
   perkey: { name: string; colors: Rgb[] }[];
+  audio: { name: string; settings: AudioSettings }[];
 }
 
 export const api = {
   presetsGet: () => invoke<Presets>("presets_get"),
   animPresetSave: (name: string, settings: AnimSettings) => invoke<Presets>("anim_preset_save", { name, settings }),
   perkeyPresetSave: (name: string, colors: Rgb[]) => invoke<Presets>("perkey_preset_save", { name, colors }),
-  presetDelete: (kind: "animation" | "perkey", name: string) => invoke<Presets>("preset_delete", { kind, name }),
+  audioPresetSave: (name: string, settings: AudioSettings) => invoke<Presets>("audio_preset_save", { name, settings }),
+  presetDelete: (kind: "animation" | "perkey" | "audio", name: string) => invoke<Presets>("preset_delete", { kind, name }),
   animGet: () => invoke<AnimState>("anim_get"),
   animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
   animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),

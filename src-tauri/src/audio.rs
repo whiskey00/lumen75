@@ -43,9 +43,13 @@ pub struct Settings {
     pub gain: f32,
     /// 0 - 9: how slowly the levels fall back.
     pub smoothness: u8,
-    /// Rainbow colours instead of `color`.
+    /// Rainbow colours instead of your `colors`.
     pub colorful: bool,
+    /// One colour: what older settings saved, used when `colors` is empty.
     pub color: Rgb,
+    /// Your colours (1-7), spread over the bands from the first to the last.
+    #[serde(default)]
+    pub colors: Vec<Rgb>,
     /// Output device to listen to, by name; None = the Windows default. Apps such as
     /// SteelSeries Sonar play music on a device other than the default.
     #[serde(default)]
@@ -54,7 +58,15 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { mode: Mode::Spectrum, gain: 1.0, smoothness: 4, colorful: true, color: [0, 255, 0], device: None }
+        Settings {
+            mode: Mode::Spectrum,
+            gain: 1.0,
+            smoothness: 4,
+            colorful: true,
+            color: [0, 255, 0],
+            colors: Vec::new(),
+            device: None,
+        }
     }
 }
 
@@ -183,15 +195,30 @@ pub fn bands(mode: Mode) -> usize {
     }
 }
 
+/// Colour at `f` (0 = first colour, 1 = last) of a list, blended between neighbours.
+fn spread(colors: &[Rgb], f: f32) -> Rgb {
+    match colors.len() {
+        0 => [255, 255, 255],
+        1 => colors[0],
+        n => {
+            let x = f.clamp(0.0, 1.0) * (n - 1) as f32;
+            let i = (x as usize).min(n - 2);
+            let k = x - i as f32;
+            [0, 1, 2].map(|c| (colors[i][c] as f32 + (colors[i + 1][c] as f32 - colors[i][c] as f32) * k).round() as u8)
+        }
+    }
+}
+
 /// Band levels -> colour groups. Each band's keys share one colour, so frames stay small and
 /// keys never jump between groups (which would flicker).
 pub fn render(leds: &[Led], levels: &[f32], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
     let n = levels.len().max(1);
+    let mine: &[Rgb] = if s.colors.is_empty() { std::slice::from_ref(&s.color) } else { &s.colors };
     let band_color = |band: usize, v: f32| -> Rgb {
         if s.colorful {
             hsv(band as f32 / n as f32 * 0.8 + t * 0.02, v)
         } else {
-            scale(s.color, v)
+            scale(spread(mine, band as f32 / (n - 1).max(1) as f32), v)
         }
     };
     let mut groups: BTreeMap<usize, (Rgb, Vec<u8>)> = BTreeMap::new();
@@ -226,7 +253,13 @@ pub fn render(leds: &[Led], levels: &[f32], s: &Settings, t: f32) -> Vec<(Rgb, V
         Mode::Pulse => {
             let bass = levels[0].max(levels.get(1).copied().unwrap_or(0.0));
             let v = bass * bass;
-            let color = if s.colorful { hsv(t * 0.05, v) } else { scale(s.color, v) };
+            // the pulse slowly moves through your colours (and back), like it does the rainbow
+            let color = if s.colorful {
+                hsv(t * 0.05, v)
+            } else {
+                let u = (t * 0.05).rem_euclid(2.0);
+                scale(spread(mine, if u > 1.0 { 2.0 - u } else { u }), v)
+            };
             for l in leds {
                 put(0, color, l.index);
             }
@@ -507,6 +540,23 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn your_colours_spread_over_the_bands() {
+        let s = Settings {
+            colorful: false,
+            colors: vec![[255, 20, 147], [255, 0, 0], [255, 110, 0]],
+            ..Settings::default()
+        };
+        let groups = render(&leds(), &[1.0; 11], &s, 0.0);
+        let colours: Vec<Rgb> = groups.iter().map(|g| g.0).collect();
+        assert!(colours.contains(&[255, 20, 147]), "first colour on the bass side: {colours:?}");
+        assert!(colours.contains(&[255, 110, 0]), "last colour on the treble side: {colours:?}");
+        assert!(colours.iter().all(|c| c[0] == 255 && c[2] <= 147), "only blends of your colours: {colours:?}");
+        // settings saved before colour lists: the single colour is used
+        let old = Settings { colorful: false, color: [0, 0, 255], ..Settings::default() };
+        assert!(render(&leds(), &[1.0; 11], &old, 0.0).iter().all(|g| g.0 == [0, 0, 255]));
     }
 
     #[test]

@@ -27,6 +27,15 @@ pub struct AppConfig {
     pub anim_presets: Vec<AnimPreset>,
     /// Your saved per-key colour layouts, by name.
     pub perkey_presets: Vec<PerkeyPreset>,
+    /// Your saved audio lighting settings, by name.
+    pub audio_presets: Vec<AudioPreset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioPreset {
+    pub name: String,
+    /// Mode, gain, smoothness and colours (the device isn't part of a preset).
+    pub settings: crate::audio::Settings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +60,7 @@ impl Default for AppConfig {
             close_to_tray: true,
             anim_presets: Vec::new(),
             perkey_presets: Vec::new(),
+            audio_presets: Vec::new(),
         }
     }
 }
@@ -190,10 +200,11 @@ pub async fn anim_stop(app: AppHandle) -> Result<AnimState, String> {
 pub struct Presets {
     animations: Vec<AnimPreset>,
     perkey: Vec<PerkeyPreset>,
+    audio: Vec<AudioPreset>,
 }
 
 fn presets(c: &AppConfig) -> Presets {
-    Presets { animations: c.anim_presets.clone(), perkey: c.perkey_presets.clone() }
+    Presets { animations: c.anim_presets.clone(), perkey: c.perkey_presets.clone(), audio: c.audio_presets.clone() }
 }
 
 fn clean_name(name: &str) -> Result<String, String> {
@@ -245,7 +256,21 @@ pub fn perkey_preset_save(app: AppHandle, name: String, colors: Vec<crate::proto
     }))
 }
 
-/// Delete a preset: `kind` is "animation" or "perkey".
+/// Save audio lighting settings under a name (replaces one with the same name).
+#[tauri::command]
+pub fn audio_preset_save(app: AppHandle, name: String, mut settings: crate::audio::Settings) -> Result<Presets, String> {
+    let name = clean_name(&name)?;
+    if settings.colors.len() > 7 {
+        return Err("Audio lighting takes at most 7 colours.".into());
+    }
+    settings.device = None; // the device belongs to your setup, not to the look
+    Ok(with_config(&app, |c| {
+        upsert(&mut c.audio_presets, AudioPreset { name, settings }, |p| &p.name);
+        presets(c)
+    }))
+}
+
+/// Delete a preset: `kind` is "animation", "perkey" or "audio".
 #[tauri::command]
 pub fn preset_delete(app: AppHandle, kind: String, name: String) -> Result<Presets, String> {
     let n = name.to_lowercase();
@@ -253,6 +278,7 @@ pub fn preset_delete(app: AppHandle, kind: String, name: String) -> Result<Prese
         match kind.as_str() {
             "animation" => c.anim_presets.retain(|p| p.name.to_lowercase() != n),
             "perkey" => c.perkey_presets.retain(|p| p.name.to_lowercase() != n),
+            "audio" => c.audio_presets.retain(|p| p.name.to_lowercase() != n),
             _ => return Err(format!("unknown preset kind {kind}")),
         }
         Ok(presets(c))

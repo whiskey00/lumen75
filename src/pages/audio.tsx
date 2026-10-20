@@ -9,9 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
+import { PresetBar } from "@/components/preset-bar";
+import { ColourList, ColourPresets } from "@/components/colour-list";
 import { cn } from "@/lib/utils";
-import { api, AudioFrame, AudioMode, AudioSettings, Catalog, fromHex, Rgb, toHex } from "@/lib/api";
+import { api, AudioFrame, AudioMode, AudioSettings, Catalog, Presets, Rgb, toHex } from "@/lib/api";
 
 const MODES: { id: AudioMode; label: string; help: string }[] = [
   { id: "spectrum", label: "Spectrum", help: "Bars rise from the bottom, bass on the left" },
@@ -20,14 +23,28 @@ const MODES: { id: AudioMode; label: string; help: string }[] = [
   { id: "pulse", label: "Pulse", help: "The whole board pulses with the bass" },
 ];
 
-const SWATCHES = ["#ff0000", "#ff8000", "#ffff00", "#00ff00", "#0000ff", "#00ffff", "#ff00ff", "#ffffff"];
 const STORE = "aula-studio.audio";
-const DEFAULTS: AudioSettings = { mode: "spectrum", gain: 1, smoothness: 4, colorful: true, color: [0, 255, 0], device: null };
+const DEFAULTS: AudioSettings = {
+  mode: "spectrum",
+  gain: 1,
+  smoothness: 4,
+  colorful: true,
+  color: [255, 20, 147],
+  colors: [
+    [255, 20, 147],
+    [255, 0, 0],
+    [255, 110, 0],
+  ],
+  device: null,
+};
 const DEFAULT_DEVICE = "__default__";
 
 function loadSettings(): AudioSettings {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE) ?? "{}") };
+    const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}");
+    // settings saved before colour lists had a single `color`
+    if (saved.color && !saved.colors) saved.colors = [saved.color];
+    return { ...DEFAULTS, ...saved };
   } catch {
     return DEFAULTS;
   }
@@ -39,11 +56,13 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
   const [starting, setStarting] = useState(false);
   const [frame, setFrame] = useState<AudioFrame | null>(null);
   const [devices, setDevices] = useState<{ devices: string[]; default: string | null }>({ devices: [], default: null });
+  const [mine, setMine] = useState<Presets["audio"]>([]);
   const first = useRef(true);
 
   useEffect(() => {
     api.audioRunning().then(setRunning);
     api.audioDevices().then(setDevices).catch(() => {});
+    api.presetsGet().then((p) => setMine(p.audio)).catch(() => {});
     const offs = [
       listen<AudioFrame>("audio-frame", (e) => setFrame(e.payload)),
       listen<string>("audio-error", (e) => toast.error("Audio lighting", { description: e.payload })),
@@ -87,7 +106,12 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
     }
   };
 
-  const set = (p: Partial<AudioSettings>) => setSettings((s) => ({ ...s, ...p }));
+  const set = (p: Partial<AudioSettings>) =>
+    setSettings((s) => {
+      const next = { ...s, ...p };
+      next.color = next.colors[0] ?? next.color; // keep the single colour in step
+      return next;
+    });
   const colours = new Map<number, Rgb>(frame?.keys ?? []);
 
   return (
@@ -170,8 +194,8 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
         </Card>
 
         <Card>
-          <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
-            <div className="grid gap-6">
+          <CardContent className="pt-6">
+            <div className="grid gap-6 md:grid-cols-2">
               <Level
                 label="Gain"
                 value={settings.gain}
@@ -191,33 +215,55 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
                 onChange={(v) => set({ smoothness: v })}
               />
             </div>
-            <div className="grid content-start gap-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="colorful">Colourful</Label>
-                <Switch id="colorful" checked={settings.colorful} onCheckedChange={(v) => set({ colorful: v })} />
-              </div>
-              <div className={cn("flex flex-wrap items-center gap-2", settings.colorful && "pointer-events-none opacity-40")}>
-                <input
-                  type="color"
-                  value={toHex(settings.color)}
-                  onChange={(e) => set({ color: fromHex(e.target.value) })}
-                  className="h-9 w-14 cursor-pointer rounded-md border bg-transparent"
-                  aria-label="Colour"
-                />
-                {SWATCHES.map((s) => (
-                  <button
-                    key={s}
-                    aria-label={s}
-                    onClick={() => set({ color: fromHex(s) })}
-                    className={cn(
-                      "size-7 rounded-full border-2 transition-transform hover:scale-110",
-                      toHex(settings.color) === s ? "border-white" : "border-transparent",
-                    )}
-                    style={{ background: s }}
-                  />
-                ))}
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div className="grid gap-1.5">
+              <CardTitle className="text-base">Colours</CardTitle>
+              <CardDescription>Rainbow, or your own colours spread over the bands (1 to 7).</CardDescription>
             </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              value={settings.colorful ? "rainbow" : "mine"}
+              onValueChange={(v) => v && set({ colorful: v === "rainbow" })}
+            >
+              <ToggleGroupItem value="rainbow">Rainbow</ToggleGroupItem>
+              <ToggleGroupItem value="mine">My colours</ToggleGroupItem>
+            </ToggleGroup>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className={cn("grid gap-4", settings.colorful && "pointer-events-none opacity-40")}>
+              <ColourList colors={settings.colors} onChange={(colors) => set({ colors })} />
+              <ColourPresets onPick={(colors) => set({ colors })} />
+            </div>
+            <PresetBar
+              title="My presets"
+              saves="these audio settings: mode, gain, smoothness and colours"
+              items={mine.map((p) => ({
+                name: p.name,
+                swatch: p.settings.colorful ? ["#ff0000", "#ffff00", "#00ff00", "#0080ff", "#ff00ff"] : p.settings.colors.map(toHex),
+              }))}
+              onLoad={(name) => {
+                const p = mine.find((x) => x.name === name);
+                if (p) set({ ...p.settings, device: settings.device }); // the device stays yours
+              }}
+              onSave={async (name) => {
+                try {
+                  setMine((await api.audioPresetSave(name, settings)).audio);
+                  toast.success(`Saved “${name.trim()}”`);
+                  return true;
+                } catch (e) {
+                  toast.error("Can't save the preset", { description: String(e) });
+                  return false;
+                }
+              }}
+              onDelete={async (name) => {
+                setMine((await api.presetDelete("audio", name)).audio);
+              }}
+            />
           </CardContent>
         </Card>
 
