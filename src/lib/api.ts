@@ -181,7 +181,16 @@ export interface AppSettings {
   idle_pause_minutes: number;
 }
 
+export interface Presets {
+  animations: { name: string; settings: AnimSettings }[];
+  perkey: { name: string; colors: Rgb[] }[];
+}
+
 export const api = {
+  presetsGet: () => invoke<Presets>("presets_get"),
+  animPresetSave: (name: string, settings: AnimSettings) => invoke<Presets>("anim_preset_save", { name, settings }),
+  perkeyPresetSave: (name: string, colors: Rgb[]) => invoke<Presets>("perkey_preset_save", { name, colors }),
+  presetDelete: (kind: "animation" | "perkey", name: string) => invoke<Presets>("preset_delete", { kind, name }),
   animGet: () => invoke<AnimState>("anim_get"),
   animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
   animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),

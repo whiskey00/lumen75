@@ -11,7 +11,7 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07`). Wi
 - **Lighting**: the 16 firmware effects with brightness (0-9), speed (0-4) and colour. Any RGB
   colour, written into the effect's palette, and factory colours back with one click.
 - **Per-key**: paint keys on the drawn keyboard (groups such as WASD, arrows and F-keys), then
-  apply. This switches the keyboard to the per-key effect.
+  apply. This switches the keyboard to the per-key effect. Save layouts as your own presets.
 - **Keys**: remap any key on the base or Fn layer to a key, a key combo or a modifier, run a
   macro from it, disable it, or reset it to its factory function. Every change is read back and
   checked.
@@ -23,7 +23,7 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07`). Wi
   captured with WASAPI loopback, so no microphone is needed. Frames stream with the real-time
   command `0x88`, about 14 a second over 2.4G. Nothing is stored on the keyboard.
 - **Animations**: Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7,
-  with presets), plus speed, brightness and direction. The F75's own multicolour effects use a
+  with presets), plus speed, brightness and direction. Save whole animations as your own presets. The F75's own multicolour effects use a
   fixed rainbow that ignores the colour palettes (tested), so these stream from the app like the
   audio lighting. They pause when the computer is idle, so the keyboard can sleep.
 - **Tray and Start with Windows**: closing the window keeps the app in the tray (Open,

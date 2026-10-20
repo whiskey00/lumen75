@@ -695,7 +695,8 @@ pub fn run() {
             catalog, status, read_all, read_battery, set_effect, reset_palette, set_custom, set_device, set_keys,
             reset_keys, save_macro, delete_macro, backup, restore, audio_start, audio_update, audio_stop,
             audio_running, audio_devices, app::anim_get, app::anim_start, app::anim_update, app::anim_stop,
-            app::app_settings_get, app::app_settings_set
+            app::app_settings_get, app::app_settings_set, app::presets_get, app::anim_preset_save,
+            app::perkey_preset_save, app::preset_delete
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

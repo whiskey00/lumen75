@@ -10,8 +10,9 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
+import { PresetBar } from "@/components/preset-bar";
 import { cn } from "@/lib/utils";
-import { api, AnimDirection, AnimFrame, AnimKind, AnimSettings, AnimState, Catalog, fromHex, Rgb, toHex } from "@/lib/api";
+import { api, AnimDirection, AnimFrame, AnimKind, AnimSettings, AnimState, Catalog, fromHex, Presets, Rgb, toHex } from "@/lib/api";
 
 const KINDS: { id: AnimKind; label: string; help: string }[] = [
   { id: "stream", label: "Stream", help: "Your colours flow across the board" },
@@ -42,10 +43,12 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
   const [state, setState] = useState<AnimState | null>(null);
   const [frame, setFrame] = useState<AnimFrame | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mine, setMine] = useState<Presets["animations"]>([]);
   const pending = useRef<number | null>(null);
 
   useEffect(() => {
     api.animGet().then(setState);
+    api.presetsGet().then((p) => setMine(p.animations)).catch(() => {});
     const offs = [
       listen<AnimFrame>("anim-frame", (e) => setFrame(e.payload)),
       listen<AnimState>("anim-state", (e) => {
@@ -188,6 +191,28 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
                 </Button>
               ))}
             </div>
+            <PresetBar
+              title="My presets"
+              saves="this animation: its type, colours, speed, brightness and direction"
+              items={mine.map((p) => ({ name: p.name, swatch: p.settings.colors.map(toHex) }))}
+              onLoad={(name) => {
+                const p = mine.find((x) => x.name === name);
+                if (p) set(p.settings);
+              }}
+              onSave={async (name) => {
+                try {
+                  setMine((await api.animPresetSave(name, s)).animations);
+                  toast.success(`Saved “${name.trim()}”`);
+                  return true;
+                } catch (e) {
+                  toast.error("Can't save the preset", { description: String(e) });
+                  return false;
+                }
+              }}
+              onDelete={async (name) => {
+                setMine((await api.presetDelete("animation", name)).animations);
+              }}
+            />
           </CardContent>
         </Card>
 

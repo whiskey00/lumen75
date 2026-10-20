@@ -3,9 +3,19 @@ import { Eraser, PaintBucket, Paintbrush, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { Keyboard } from "@/components/keyboard";
+import { PresetBar } from "@/components/preset-bar";
 import { cn } from "@/lib/utils";
-import { api, Board, Catalog, fromHex, Rgb, toHex } from "@/lib/api";
+import { api, Board, Catalog, fromHex, Presets, Rgb, toHex } from "@/lib/api";
+
+/** The most used colours of a layout (ignoring keys that are off), for the preset chip. */
+function mainColours(colors: Rgb[]): string[] {
+  const count = new Map<string, number>();
+  for (const c of colors) if (c.some((v) => v)) count.set(toHex(c), (count.get(toHex(c)) ?? 0) + 1);
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  return top.length ? top.slice(0, 5) : ["#000000"];
+}
 import type { Run } from "@/lib/run";
 
 const SWATCHES = ["#ff0000", "#ff6000", "#ffd000", "#00ff40", "#00e5ff", "#0040ff", "#8a00ff", "#ff00b0", "#ffffff"];
@@ -23,7 +33,11 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
   const [draft, setDraft] = useState<Rgb[]>(board.custom);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [colour, setColour] = useState("#ff0000");
+  const [mine, setMine] = useState<Presets["perkey"]>([]);
   useEffect(() => setDraft(board.custom), [board.custom]);
+  useEffect(() => {
+    api.presetsGet().then((p) => setMine(p.perkey)).catch(() => {});
+  }, []);
 
   const dirty = useMemo(() => draft.some((c, i) => c.join() !== board.custom[i]?.join()), [draft, board.custom]);
   const keys = catalog.keys;
@@ -120,6 +134,36 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
               <PaintBucket /> Fill all
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <PresetBar
+            title="My layouts"
+            saves="the colours of every key as they are in the editor now (also changes you haven't applied)"
+            items={mine.map((p) => ({ name: p.name, swatch: mainColours(p.colors) }))}
+            onLoad={(name) => {
+              const p = mine.find((x) => x.name === name);
+              if (p) {
+                setDraft(p.colors);
+                toast.info(`Loaded “${name}”`, { description: "Click “Apply to keyboard” to send it." });
+              }
+            }}
+            onSave={async (name) => {
+              try {
+                setMine((await api.perkeyPresetSave(name, draft)).perkey);
+                toast.success(`Saved “${name.trim()}”`);
+                return true;
+              } catch (e) {
+                toast.error("Can't save the layout", { description: String(e) });
+                return false;
+              }
+            }}
+            onDelete={async (name) => {
+              setMine((await api.presetDelete("perkey", name)).perkey);
+            }}
+          />
         </CardContent>
       </Card>
 

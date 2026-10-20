@@ -23,11 +23,35 @@ pub struct AppConfig {
     pub idle_pause_minutes: u32,
     /// Closing the window keeps the app running in the tray.
     pub close_to_tray: bool,
+    /// Your saved animations, by name.
+    pub anim_presets: Vec<AnimPreset>,
+    /// Your saved per-key colour layouts, by name.
+    pub perkey_presets: Vec<PerkeyPreset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnimPreset {
+    pub name: String,
+    pub settings: anim::Settings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerkeyPreset {
+    pub name: String,
+    /// 126 colours by matrix index.
+    pub colors: Vec<crate::protocol::Rgb>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
-        AppConfig { animation: anim::Settings::default(), animation_on: false, idle_pause_minutes: 5, close_to_tray: true }
+        AppConfig {
+            animation: anim::Settings::default(),
+            animation_on: false,
+            idle_pause_minutes: 5,
+            close_to_tray: true,
+            anim_presets: Vec::new(),
+            perkey_presets: Vec::new(),
+        }
     }
 }
 
@@ -158,6 +182,81 @@ pub async fn anim_stop(app: AppHandle) -> Result<AnimState, String> {
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || stop_animation(&a, true)).await.map_err(|e| e.to_string())?;
     Ok(anim_state(&app))
+}
+
+// ------------------------------------------------------------ your presets
+
+#[derive(Serialize)]
+pub struct Presets {
+    animations: Vec<AnimPreset>,
+    perkey: Vec<PerkeyPreset>,
+}
+
+fn presets(c: &AppConfig) -> Presets {
+    Presets { animations: c.anim_presets.clone(), perkey: c.perkey_presets.clone() }
+}
+
+fn clean_name(name: &str) -> Result<String, String> {
+    let n = name.trim();
+    if n.is_empty() {
+        return Err("Give the preset a name.".into());
+    }
+    Ok(n.chars().take(40).collect())
+}
+
+/// Insert or replace (same name, ignoring case) and keep the list sorted by name.
+fn upsert<T>(list: &mut Vec<T>, item: T, name_of: impl Fn(&T) -> &str) {
+    let name = name_of(&item).to_lowercase();
+    match list.iter().position(|x| name_of(x).to_lowercase() == name) {
+        Some(i) => list[i] = item,
+        None => list.push(item),
+    }
+    list.sort_by_key(|x| name_of(x).to_lowercase());
+}
+
+#[tauri::command]
+pub fn presets_get(app: AppHandle) -> Presets {
+    presets(&app.state::<AppState>().config.lock().unwrap())
+}
+
+/// Save an animation under a name (replaces one with the same name).
+#[tauri::command]
+pub fn anim_preset_save(app: AppHandle, name: String, settings: anim::Settings) -> Result<Presets, String> {
+    let name = clean_name(&name)?;
+    if settings.colors.is_empty() || settings.colors.len() > 7 {
+        return Err("An animation needs 1 to 7 colours.".into());
+    }
+    Ok(with_config(&app, |c| {
+        upsert(&mut c.anim_presets, AnimPreset { name, settings }, |p| &p.name);
+        presets(c)
+    }))
+}
+
+/// Save a per-key layout under a name (replaces one with the same name).
+#[tauri::command]
+pub fn perkey_preset_save(app: AppHandle, name: String, colors: Vec<crate::protocol::Rgb>) -> Result<Presets, String> {
+    let name = clean_name(&name)?;
+    if colors.len() != crate::protocol::MATRIX_LEN {
+        return Err("A per-key layout needs 126 colours.".into());
+    }
+    Ok(with_config(&app, |c| {
+        upsert(&mut c.perkey_presets, PerkeyPreset { name, colors }, |p| &p.name);
+        presets(c)
+    }))
+}
+
+/// Delete a preset: `kind` is "animation" or "perkey".
+#[tauri::command]
+pub fn preset_delete(app: AppHandle, kind: String, name: String) -> Result<Presets, String> {
+    let n = name.to_lowercase();
+    with_config(&app, |c| {
+        match kind.as_str() {
+            "animation" => c.anim_presets.retain(|p| p.name.to_lowercase() != n),
+            "perkey" => c.perkey_presets.retain(|p| p.name.to_lowercase() != n),
+            _ => return Err(format!("unknown preset kind {kind}")),
+        }
+        Ok(presets(c))
+    })
 }
 
 // ------------------------------------------------------------ app settings
@@ -299,5 +398,34 @@ pub fn on_close_requested(window: &tauri::Window<Wry>, api: &tauri::CloseRequest
         let _ = window.hide();
     } else {
         quit(app);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saving_under_an_existing_name_replaces_it() {
+        let mut list: Vec<(String, u8)> = Vec::new();
+        upsert(&mut list, ("Sunset".into(), 1), |p| &p.0);
+        upsert(&mut list, ("aqua".into(), 2), |p| &p.0);
+        upsert(&mut list, ("SUNSET".into(), 3), |p| &p.0); // same name, other case
+        assert_eq!(list, vec![("aqua".to_string(), 2), ("SUNSET".to_string(), 3)]);
+    }
+
+    #[test]
+    fn preset_names() {
+        assert!(clean_name("   ").is_err());
+        assert_eq!(clean_name("  My red  ").unwrap(), "My red");
+        assert_eq!(clean_name(&"x".repeat(80)).unwrap().len(), 40);
+    }
+
+    #[test]
+    fn old_settings_files_still_load() {
+        // written before presets existed: the preset lists default to empty
+        let c: AppConfig = serde_json::from_str(r#"{"animation_on": true, "idle_pause_minutes": 10}"#).unwrap();
+        assert!(c.animation_on && c.anim_presets.is_empty() && c.perkey_presets.is_empty());
+        assert_eq!(c.idle_pause_minutes, 10);
     }
 }
