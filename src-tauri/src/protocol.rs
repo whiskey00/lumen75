@@ -26,7 +26,17 @@ pub const CMD_SET_MACRO: u8 = 0x03;
 pub const CMD_SET_LED: u8 = 0x04; // effect / brightness / speed / colour and device settings
 pub const CMD_SET_PALETTE: u8 = 0x09; // per-effect 7-colour palettes
 pub const CMD_PROFILE: u8 = 0x0A; // reply's first byte is probably the battery %
+pub const CMD_LIVE: u8 = 0x88; // real-time frame: not acknowledged, not stored (see live_frame)
 pub const READ: u8 = 0x40;
+
+/// Sub of CMD_LIVE: per-key colours as colour groups.
+pub const LIVE_KEYS: u8 = 1;
+/// Longest frame the official app sends.
+pub const LIVE_MAX: usize = 200;
+/// Longer frames (more than 9 packets) get lost more often (tested upstream).
+pub const LIVE_BUDGET: usize = 126;
+/// ms between packets: closer together, the keyboard drops frames (tested upstream).
+pub const LIVE_GAP_MS: u64 = 5;
 
 pub const MATRIX_LEN: usize = 126;
 pub const MATRIX_BYTES: usize = MATRIX_LEN * 4; // 504
@@ -297,6 +307,31 @@ pub fn custom_from_colors(colors: &[(u8, Rgb)]) -> Vec<u8> {
 
 pub fn colors_from_custom(raw: &[u8]) -> Vec<Rgb> {
     (0..MATRIX_LEN).map(|i| [raw[i], raw[MATRIX_LEN + i], raw[2 * MATRIX_LEN + i]]).collect()
+}
+
+// ------------------------------------------------------------ real-time frames
+
+/// Colour groups -> a real-time frame for CMD_LIVE / LIVE_KEYS: [R, G, B, count, index…] per
+/// group. Keys that aren't listed go dark, so black groups are left out.
+pub fn live_frame(groups: &[(Rgb, Vec<u8>)]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    for (rgb, keys) in groups {
+        if keys.is_empty() || *rgb == [0, 0, 0] {
+            continue;
+        }
+        let mut keys = keys.clone();
+        keys.sort_unstable();
+        out.extend_from_slice(rgb);
+        out.push(keys.len() as u8);
+        out.extend(keys);
+    }
+    if out.is_empty() {
+        return Ok(vec![0, 0, 0, 1, 0]); // a single dark key: everything off
+    }
+    if out.len() > LIVE_MAX {
+        return err(format!("real-time frame too long ({} bytes, at most {LIVE_MAX})", out.len()));
+    }
+    Ok(out)
 }
 
 // ------------------------------------------------------------ palettes

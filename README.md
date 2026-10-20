@@ -18,6 +18,10 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07`). Wi
 - **Macros**: steps such as `text:Hello`, `ctrl+c`, `wait:100` and `down:shift`, stored on the
   keyboard and assigned to a key (run N times, while held, or until a key is pressed). Text is
   typed for the computer's layout (US or Turkish Q).
+- **Audio**: the lights follow whatever the computer plays (Spectrum, Mirror, Ripple, Pulse),
+  with gain, smoothness, colourful or one colour, and a choice of output device. Audio is
+  captured with WASAPI loopback, so no microphone is needed. Frames stream with the real-time
+  command `0x88`, about 14 a second over 2.4G. Nothing is stored on the keyboard.
 - **Device**: side light, knob mode, OS mode, Windows-key lock and sleep timer. Battery level
   (experimental).
 - **Backup / restore**: same hex files as `aula backup` / `aula restore`, so backups work with
@@ -36,6 +40,8 @@ Close the official AULA app first. It uses the same channel, and the app warns w
   sent straight after a write.
 - `win.rs`: finds the configuration collection (usage page `0xFF02`), overlapped I/O, and only
   talks to the keyboard while no key is held. Otherwise the keyboard can drop a key release.
+- `audio.rs`: loopback capture (cpal), FFT bands with automatic level, the modes, and colour
+  groups that fit the 126-byte frame budget.
 - `macros.rs`, `keymap.rs`: macro store format, step parser, key layout and HID usages.
 
 ## Develop

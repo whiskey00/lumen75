@@ -127,7 +127,35 @@ export interface MacroSave {
   count: number;
 }
 
+export type AudioMode = "spectrum" | "mirror" | "ripple" | "pulse";
+
+export interface AudioSettings {
+  mode: AudioMode;
+  /** 0.2 - 4.0 */
+  gain: number;
+  /** 0 - 9 */
+  smoothness: number;
+  colorful: boolean;
+  color: Rgb;
+  /** Output device to listen to; null = the Windows default. */
+  device: string | null;
+}
+
+/** One streamed frame: band levels (0..1) and the key colours shown. */
+export interface AudioFrame {
+  levels: number[];
+  keys: [number, Rgb][];
+  /** No sound arrived from the device for a second. */
+  silent: boolean;
+  device: string;
+}
+
 export const api = {
+  audioStart: (settings: AudioSettings) => invoke<void>("audio_start", { settings }),
+  audioUpdate: (settings: AudioSettings) => invoke<void>("audio_update", { settings }),
+  audioStop: () => invoke<void>("audio_stop"),
+  audioRunning: () => invoke<boolean>("audio_running"),
+  audioDevices: () => invoke<{ devices: string[]; default: string | null }>("audio_devices"),
   catalog: () => invoke<Catalog>("catalog"),
   status: () => invoke<Status>("status"),
   readAll: () => invoke<Snapshot>("read_all"),

@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod device;
 pub mod keymap;
 pub mod macros;
@@ -129,6 +130,8 @@ struct DeviceInfoView {
 #[derive(Default)]
 struct AppState {
     kb: Arc<Mutex<Option<Keyboard>>>,
+    #[cfg(windows)]
+    audio: Mutex<Option<audio::run::Handle>>,
 }
 
 #[cfg(windows)]
@@ -584,6 +587,78 @@ async fn restore(state: tauri::State<'_, AppState>, folder: String) -> std::resu
     .await
 }
 
+// ------------------------------------------------------------ audio
+
+/// Start lighting the keyboard to the computer's sound. Frames go to the UI as
+/// "audio-frame" events, problems as "audio-error", the end as "audio-stopped".
+#[cfg(windows)]
+#[tauri::command]
+fn audio_start(app: tauri::AppHandle, state: tauri::State<'_, AppState>, settings: audio::Settings) -> std::result::Result<(), String> {
+    use tauri::Emitter;
+    let mut slot = state.audio.lock().map_err(|_| "audio lock poisoned".to_string())?;
+    if let Some(h) = slot.as_ref() {
+        *h.settings.lock().unwrap() = settings;
+        return Ok(());
+    }
+    if win::vendor_app_running() {
+        return Err("The official AULA app (OemDrv.exe) is running. Quit it first (also from the tray).".into());
+    }
+    let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, move |ev| {
+        let _ = match ev {
+            audio::run::Event::Frame(f) => app.emit("audio-frame", f),
+            audio::run::Event::Error(e) => app.emit("audio-error", e),
+            audio::run::Event::Stopped => app.emit("audio-stopped", ()),
+        };
+    })?;
+    *slot = Some(handle);
+    Ok(())
+}
+
+/// Change mode, gain, smoothness or colour while it runs.
+#[cfg(windows)]
+#[tauri::command]
+fn audio_update(state: tauri::State<'_, AppState>, settings: audio::Settings) -> std::result::Result<(), String> {
+    if let Some(h) = state.audio.lock().map_err(|_| "audio lock poisoned".to_string())?.as_ref() {
+        *h.settings.lock().unwrap() = settings;
+    }
+    Ok(())
+}
+
+/// Stop; the keyboard goes back to its own effect about 2 s later.
+#[cfg(windows)]
+#[tauri::command]
+async fn audio_stop(state: tauri::State<'_, AppState>) -> std::result::Result<(), String> {
+    let handle = state.audio.lock().map_err(|_| "audio lock poisoned".to_string())?.take();
+    if let Some(h) = handle {
+        tauri::async_runtime::spawn_blocking(move || h.stop()).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct AudioDevices {
+    devices: Vec<String>,
+    default: Option<String>,
+}
+
+/// Output devices the audio lighting can listen to.
+#[cfg(windows)]
+#[tauri::command]
+async fn audio_devices() -> std::result::Result<AudioDevices, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let (devices, default) = audio::run::output_devices();
+        AudioDevices { devices, default }
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn audio_running(state: tauri::State<'_, AppState>) -> bool {
+    state.audio.lock().map(|a| a.is_some()).unwrap_or(false)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -591,7 +666,8 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             catalog, status, read_all, read_battery, set_effect, reset_palette, set_custom, set_device, set_keys,
-            reset_keys, save_macro, delete_macro, backup, restore
+            reset_keys, save_macro, delete_macro, backup, restore, audio_start, audio_update, audio_stop,
+            audio_running, audio_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

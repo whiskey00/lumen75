@@ -18,7 +18,7 @@ use windows_sys::Win32::Devices::HumanInterfaceDevice::{
     HidP_GetCaps, HIDD_ATTRIBUTES, HIDP_CAPS,
 };
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GetLastError, ERROR_ACCESS_DENIED, ERROR_IO_PENDING, GENERIC_READ, GENERIC_WRITE, HANDLE,
+    CloseHandle, GetLastError, ERROR_ACCESS_DENIED, ERROR_IO_PENDING, ERROR_OPERATION_ABORTED, GENERIC_READ, GENERIC_WRITE, HANDLE,
     INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows_sys::Win32::Storage::FileSystem::{
@@ -28,7 +28,7 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
 use windows_sys::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForSingleObject};
-use windows_sys::Win32::System::IO::{CancelIo, GetOverlappedResult, OVERLAPPED};
+use windows_sys::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyboardLayout};
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
@@ -218,7 +218,11 @@ impl Channel for WinChannel {
                 return Err(Self::last_error("Writing to the keyboard failed"));
             }
             if WaitForSingleObject(self.wr_ev, 1000) != WAIT_OBJECT_0 {
-                CancelIo(self.h);
+                // cancel only this write (not the pending read), and wait until Windows is
+                // done with `ov` before it goes out of scope
+                CancelIoEx(self.h, &ov);
+                let mut done = 0u32;
+                GetOverlappedResult(self.h, &ov, &mut done, 1);
                 return derr("Writing to the keyboard timed out.");
             }
             let mut done = 0u32;
@@ -248,6 +252,12 @@ impl Channel for WinChannel {
             self.pending = false;
             let mut got = 0u32;
             if GetOverlappedResult(self.h, &*self.rd_ov, &mut got, 0) == 0 {
+                // Windows cancels a thread's pending I/O when the thread exits. The app uses
+                // the channel from different worker threads, so a read left pending by one of
+                // them can come back aborted: that's no data, and the next call reads again.
+                if GetLastError() == ERROR_OPERATION_ABORTED {
+                    return Ok(None);
+                }
                 return Err(Self::last_error("Reading from the keyboard failed"));
             }
             Ok(Some(self.rd_buf[..got as usize].to_vec()))
@@ -259,7 +269,8 @@ impl Drop for WinChannel {
     fn drop(&mut self) {
         unsafe {
             if self.pending {
-                CancelIo(self.h);
+                // CancelIoEx: the read may have been issued by another thread
+                CancelIoEx(self.h, &*self.rd_ov);
                 let mut got = 0u32;
                 GetOverlappedResult(self.h, &*self.rd_ov, &mut got, 1);
             }

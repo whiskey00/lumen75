@@ -202,6 +202,18 @@ impl Keyboard {
         Ok(false)
     }
 
+    /// Show a real-time frame until the next one arrives. Nothing is stored or acknowledged,
+    /// so a lost packet loses the frame; the gap between packets keeps that rare. Without a
+    /// new frame the keyboard goes back to its own effect after about 2 seconds. Typing keeps
+    /// working while frames stream, so the key guard is skipped (tested upstream).
+    pub fn send_live(&mut self, frame: &[u8]) -> Result<()> {
+        for pkt in p::split_packets(p::CMD_LIVE, p::LIVE_KEYS, frame) {
+            self.ch.write(&pkt)?;
+            sleep(Duration::from_millis(p::LIVE_GAP_MS));
+        }
+        self.ch.drain()
+    }
+
     // ------------------------------------------------------------ tables
 
     pub fn get_led(&mut self) -> Result<p::LedConfig> {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BatteryFull, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
+import { AudioLines, BatteryFull, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +12,14 @@ import { PerKeyPage } from "@/pages/perkey";
 import { KeysPage } from "@/pages/keys";
 import { MacrosPage } from "@/pages/macros";
 import { DevicePage } from "@/pages/device";
+import { AudioPage } from "@/pages/audio";
 
-type Page = "lighting" | "perkey" | "keys" | "macros" | "device";
+type Page = "lighting" | "perkey" | "audio" | "keys" | "macros" | "device";
 
 const PAGES: { id: Page; label: string; icon: typeof Sun }[] = [
   { id: "lighting", label: "Lighting", icon: Sun },
   { id: "perkey", label: "Per-key", icon: Grid3x3 },
+  { id: "audio", label: "Audio", icon: AudioLines },
   { id: "keys", label: "Keys", icon: KeyboardIcon },
   { id: "macros", label: "Macros", icon: SquareFunction },
   { id: "device", label: "Device", icon: Settings2 },
@@ -168,6 +170,7 @@ export default function App() {
               <>
                 {page === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {page === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {page === "audio" && <AudioPage catalog={catalog} />}
                 {page === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {page === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {page === "device" && (
