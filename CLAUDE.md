@@ -23,6 +23,12 @@ work is done here.
   and Device pages) **and the live stream** (Animations, Audio), verified on hardware. Palette
   and keymap writes and per-key colours are next, one at a time.
   See "Wired protocol" below.
+- **League lighting: built, not yet verified in a real match** (branch `league-lighting`). Code:
+  `league.rs` (local HTTPS client pinned to Riot's root `certs/riotgames.pem`, parsing, your
+  events), `gamelight.rs` (setup and renderer), `match_watch.rs` (match lifecycle, watcher
+  thread), handover in `app.rs`, page `src/pages/games.tsx`. Design and plan in
+  `docs/superpowers/`. Debug builds print each kill event's names (`[league] kill: ...`) to check
+  Riot ID matching.
 - Battery reading is experimental (first byte of the 0x4A reply).
 - No git remote yet: the owner will add a GitHub repo and push.
 

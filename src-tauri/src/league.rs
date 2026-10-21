@@ -331,6 +331,15 @@ fn classify(e: &RawEvent, team: Team, players: &Players) -> Vec<GameEvent> {
     let mut out = Vec::new();
     match e.name.as_str() {
         "ChampionKill" => {
+            // for checking the name forms in a real match (`npm run tauri dev` terminal)
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[league] kill: killer {:?}, victim {:?}, assisters {}; you: {:?}",
+                s("KillerName"),
+                s("VictimName"),
+                f["Assisters"],
+                players.me
+            );
             if players.is_me(s("KillerName")) {
                 out.push(GameEvent::new(Event::Kill));
             }
