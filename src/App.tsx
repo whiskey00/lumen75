@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { api, Board, Catalog, merge, Snapshot, Status } from "@/lib/api";
+import { api, Board, Catalog, Connection, merge, Snapshot, Status } from "@/lib/api";
 import { LightingPage } from "@/pages/lighting";
 import { PerKeyPage } from "@/pages/perkey";
 import { KeysPage } from "@/pages/keys";
@@ -29,6 +30,14 @@ const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[]
 
 const CABLE = "USB cable";
 
+/** The connection choices, with the device mode each one finds (none: any). */
+const CONNECTIONS: { id: Connection; label: string; mode?: string }[] = [
+  { id: "auto", label: "Auto" },
+  { id: "cable", label: "USB cable", mode: CABLE },
+  { id: "dongle", label: "2.4G dongle", mode: "2.4G dongle" },
+  { id: "bluetooth", label: "Bluetooth", mode: "Bluetooth" },
+];
+
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -37,6 +46,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connection, setConnection] = useState<Connection>("auto");
   const busyRef = useRef(false);
 
   const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => {}), []);
@@ -57,8 +67,21 @@ export default function App() {
 
   useEffect(() => {
     api.catalog().then(setCatalog);
+    api.appSettingsGet().then((s) => setConnection(s.connection)).catch(() => {});
     reload();
   }, [reload]);
+
+  const chooseConnection = async (c: Connection) => {
+    setConnection(c);
+    setBoard(null);
+    try {
+      await api.appSettingsSet({ connection: c });
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
+    reload();
+  };
 
   // device list and the official-app check; the keyboard itself is only touched by commands
   useEffect(() => {
@@ -87,7 +110,8 @@ export default function App() {
     }
   }, []);
 
-  const supported = status?.devices.find((d) => d.supported);
+  const wanted = CONNECTIONS.find((c) => c.id === connection)?.mode;
+  const supported = status?.devices.find((d) => d.supported && (!wanted || d.mode === wanted));
   const onCable = board?.mode === CABLE;
   // a page the cable can't serve falls back to Lighting
   const shown: Page = onCable && PAGES.find((p) => p.id === page)?.wireless ? "lighting" : page;
@@ -127,6 +151,18 @@ export default function App() {
         <header className="flex items-center gap-3 border-b px-6 py-3">
           <h1 className="text-base font-medium">{PAGES.find((p) => p.id === shown)?.label}</h1>
           <div className="ml-auto flex items-center gap-2">
+            <Select value={connection} onValueChange={(v) => chooseConnection(v as Connection)} disabled={busy || loading}>
+              <SelectTrigger size="sm" title="Which connection to use">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CONNECTIONS.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {board ? (
               <Badge variant="secondary" className="gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-500" /> {board.mode}

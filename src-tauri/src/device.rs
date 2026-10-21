@@ -5,6 +5,7 @@
 use crate::protocol::{self as p, Packet};
 use rand::Rng;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -69,6 +70,46 @@ impl Channel for NoPackets {
 /// that key, so the keyboard is only talked to while no key is held.
 pub trait KeyGuard: Send {
     fn wait_released(&mut self, quiet: Duration, limit: Duration) -> Result<()>;
+}
+
+/// The connection the app looks for, chosen in the app and saved with its settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Connection {
+    /// Whichever one is there (the cable first).
+    #[default]
+    Auto,
+    Cable,
+    Dongle,
+    Bluetooth,
+}
+
+impl Connection {
+    /// The mode it allows, or None for any.
+    pub fn mode(self) -> Option<Mode> {
+        match self {
+            Connection::Auto => None,
+            Connection::Cable => Some(Mode::Wired),
+            Connection::Dongle => Some(Mode::Dongle),
+            Connection::Bluetooth => Some(Mode::Bluetooth),
+        }
+    }
+}
+
+// A plain static, so `open` keeps working as a fn pointer (the animations and audio use it).
+static CONNECTION: AtomicU8 = AtomicU8::new(0);
+
+pub fn set_connection(c: Connection) {
+    CONNECTION.store(c as u8, Ordering::Relaxed);
+}
+
+pub fn connection() -> Connection {
+    match CONNECTION.load(Ordering::Relaxed) {
+        1 => Connection::Cable,
+        2 => Connection::Dongle,
+        3 => Connection::Bluetooth,
+        _ => Connection::Auto,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]

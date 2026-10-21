@@ -29,6 +29,8 @@ pub struct AppConfig {
     pub perkey_presets: Vec<PerkeyPreset>,
     /// Your saved audio lighting settings, by name.
     pub audio_presets: Vec<AudioPreset>,
+    /// Which connection to look for: auto, cable, dongle or bluetooth.
+    pub connection: crate::device::Connection,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +63,7 @@ impl Default for AppConfig {
             anim_presets: Vec::new(),
             perkey_presets: Vec::new(),
             audio_presets: Vec::new(),
+            connection: Default::default(),
         }
     }
 }
@@ -292,6 +295,7 @@ pub struct AppSettings {
     start_with_windows: bool,
     close_to_tray: bool,
     idle_pause_minutes: u32,
+    connection: crate::device::Connection,
 }
 
 #[derive(Deserialize)]
@@ -299,6 +303,7 @@ pub struct AppSettingsChange {
     start_with_windows: Option<bool>,
     close_to_tray: Option<bool>,
     idle_pause_minutes: Option<u32>,
+    connection: Option<crate::device::Connection>,
 }
 
 fn app_settings(app: &AppHandle) -> AppSettings {
@@ -307,6 +312,7 @@ fn app_settings(app: &AppHandle) -> AppSettings {
         start_with_windows: app.autolaunch().is_enabled().unwrap_or(false),
         close_to_tray: c.close_to_tray,
         idle_pause_minutes: c.idle_pause_minutes,
+        connection: c.connection,
     }
 }
 
@@ -328,7 +334,15 @@ pub fn app_settings_set(app: AppHandle, change: AppSettingsChange) -> Result<App
         if let Some(v) = change.idle_pause_minutes {
             c.idle_pause_minutes = v.min(240);
         }
+        if let Some(v) = change.connection {
+            c.connection = v;
+        }
     });
+    if let Some(v) = change.connection {
+        crate::device::set_connection(v);
+        // the next command (or animation frame) opens the keyboard over the new choice
+        *app.state::<AppState>().kb.lock().unwrap() = None;
+    }
     if let Some(m) = change.idle_pause_minutes {
         if let Some(h) = app.state::<AppState>().anim.lock().unwrap().as_ref() {
             h.idle_pause.store(m.min(240) * 60, std::sync::atomic::Ordering::Relaxed);
@@ -402,6 +416,7 @@ fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
 /// animation if it was running when the app last closed.
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let config = load_config(app);
+    crate::device::set_connection(config.connection);
     let resume = config.animation_on;
     *app.state::<AppState>().config.lock().unwrap() = config;
     build_tray(app, false)?;

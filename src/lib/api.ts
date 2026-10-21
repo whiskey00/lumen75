@@ -180,10 +180,14 @@ export interface AnimFrame {
   paused: boolean;
 }
 
+/** Which connection the app looks for. */
+export type Connection = "auto" | "cable" | "dongle" | "bluetooth";
+
 export interface AppSettings {
   start_with_windows: boolean;
   close_to_tray: boolean;
   idle_pause_minutes: number;
+  connection: Connection;
 }
 
 export interface Presets {

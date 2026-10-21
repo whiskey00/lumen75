@@ -1,7 +1,7 @@
 //! Windows HID access to the F75's configuration channel. Ported from aula-f75-hub's
 //! `aula/backends/windows.py` (MIT), which was tested on hardware (2026-10-20).
 
-use crate::device::{derr, Channel, DeviceError, FeatureChannel, KeyGuard, Mode, Result};
+use crate::device::{derr, Channel, Connection, DeviceError, FeatureChannel, KeyGuard, Mode, Result};
 use crate::protocol::{Packet, WiredReport, PACKET_LEN, WIRED_REPORT_LEN};
 use serde::Serialize;
 use std::ffi::c_void;
@@ -368,20 +368,46 @@ impl KeyGuard for WinKeyGuard {
     }
 }
 
-/// Open the keyboard: the one supported channel, or (several candidates) the one that answers.
+fn mode_of(d: &DeviceInfo) -> Mode {
+    match d.mode.as_str() {
+        "USB cable" => Mode::Wired,
+        "Bluetooth" => Mode::Bluetooth,
+        _ => Mode::Dongle,
+    }
+}
+
+/// The candidates for a connection choice, the cable first: Windows keeps listing a paired
+/// Bluetooth keyboard while it's on the cable.
+fn candidates(all: &[DeviceInfo], want: Connection) -> Vec<&DeviceInfo> {
+    let mut devs: Vec<&DeviceInfo> =
+        all.iter().filter(|d| d.supported && want.mode().is_none_or(|m| mode_of(d) == m)).collect();
+    devs.sort_by_key(|d| mode_of(d) != Mode::Wired);
+    devs
+}
+
+fn not_found(want: Connection) -> &'static str {
+    match want {
+        Connection::Auto => "AULA F75 not found. Is the dongle plugged in and the keyboard switched on (2.4G or Bluetooth), or the cable plugged in with the switch on wired?",
+        Connection::Cable => "No AULA F75 on the USB cable. Plug in the cable and set the switch on the back to wired, or pick another connection.",
+        Connection::Dongle => "No AULA F75 on the 2.4G dongle. Plug in the dongle and set the switch to 2.4G, or pick another connection.",
+        Connection::Bluetooth => "No AULA F75 over Bluetooth. Pair it in Windows settings (\"AULA-F75 5.0\") and set the switch to Bluetooth, or pick another connection.",
+    }
+}
+
+/// Open the keyboard over the chosen connection: the one candidate, or (several) the one
+/// that answers.
 pub fn open_keyboard() -> Result<crate::device::Keyboard> {
     let all = find_devices();
-    let mut devs: Vec<&DeviceInfo> = all.iter().filter(|d| d.supported).collect();
-    // Windows keeps listing a paired Bluetooth keyboard while it's on the cable: try the cable first
-    devs.sort_by_key(|d| d.mode != "USB cable");
+    let want = crate::device::connection();
+    let devs = candidates(&all, want);
     if devs.is_empty() {
-        return derr("AULA F75 not found. Is the dongle plugged in and the keyboard switched on (2.4G or Bluetooth), or the cable plugged in with the switch on wired?");
+        return derr(not_found(want));
     }
     let make = |d: &DeviceInfo| -> Result<crate::device::Keyboard> {
-        if d.mode == "USB cable" {
+        let mode = mode_of(d);
+        if mode == Mode::Wired {
             return Ok(crate::device::Keyboard::wired(Box::new(WiredChannel::open(&d.path)?), Box::new(WinKeyGuard::new())));
         }
-        let mode = if d.mode == "Bluetooth" { Mode::Bluetooth } else { Mode::Dongle };
         Ok(crate::device::Keyboard::new(mode, Box::new(WinChannel::open(&d.path)?), Box::new(WinKeyGuard::new())))
     };
     if devs.len() == 1 {
@@ -440,7 +466,19 @@ pub fn detect_layout() -> crate::macros::Layout {
 
 #[cfg(test)]
 mod tests {
-    use super::maybe_aula;
+    use super::{candidates, maybe_aula, Connection, DeviceInfo};
+
+    #[test]
+    fn connection_choice_filters_and_puts_the_cable_first() {
+        let dev = |mode: &str| DeviceInfo { path: mode.into(), mode: mode.into(), supported: true, name: String::new() };
+        let all = vec![dev("Bluetooth"), dev("2.4G dongle"), dev("USB cable")];
+        let modes = |c| candidates(&all, c).iter().map(|d| d.mode.clone()).collect::<Vec<_>>();
+        assert_eq!(modes(Connection::Auto), ["USB cable", "Bluetooth", "2.4G dongle"]);
+        assert_eq!(modes(Connection::Bluetooth), ["Bluetooth"]);
+        assert_eq!(modes(Connection::Dongle), ["2.4G dongle"]);
+        assert_eq!(modes(Connection::Cable), ["USB cable"]);
+        assert!(candidates(&all[..2], Connection::Cable).is_empty());
+    }
 
     #[test]
     fn finds_usb_and_bluetooth_paths() {

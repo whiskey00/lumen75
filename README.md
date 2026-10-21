@@ -8,6 +8,9 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07` over
 animations and audio lighting so far; custom colours, key remapping, per-key colours and macros
 still need the dongle or Bluetooth.
 
+Pick the connection in the header: **Auto** (whichever is there, the cable first), **USB cable**,
+**2.4G dongle** or **Bluetooth**. The choice is saved and used from the next start.
+
 ## Features
 
 - **Lighting**: the 16 firmware effects with brightness (0-9), speed (0-4) and colour. Any RGB
