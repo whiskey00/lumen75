@@ -20,7 +20,7 @@ export default defineConfig(() => ({
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available.
-  //    1430, not Tauri's default 1420, so this can run next to RAKK Studio.
+  //    1430, not Tauri's default 1420, so it can run next to other Tauri apps in dev.
   server: {
     port: 1430,
     strictPort: true,
