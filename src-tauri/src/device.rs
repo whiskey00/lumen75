@@ -112,15 +112,30 @@ impl Keyboard {
     /// reply, so the request is repeated and the parts are collected across attempts.
     pub fn read(&mut self, cmd: u8, sub: u8) -> Result<Vec<u8>> {
         let rcmd = cmd | p::READ;
-        let retries = if self.bluetooth() { 15 } else { 5 };
+        // Over Bluetooth LE only 4-7 packets of a reply get through per attempt, at random, so
+        // a 37-packet read took 14-33 attempts (9-28 s, tested on Windows 2026-10-21). Keep
+        // asking while new packets still come in; stalls of 15 attempts on one packet happened.
+        let retries = if self.bluetooth() { 60 } else { 5 };
+        let max_stall = if self.bluetooth() { 25 } else { retries };
+        let mut stall = 0;
         let mut parts: BTreeMap<u8, Vec<u8>> = BTreeMap::new();
         let mut total: Option<u8> = None;
         self.settle(Duration::from_millis(500));
-        for _ in 0..retries {
+        for attempt in 0..retries {
+            if stall >= max_stall {
+                break;
+            }
+            let before = parts.len();
             self.wait_keys_released()?;
             self.ch.drain()?;
             if self.bluetooth() {
-                // shift the burst against the radio's timing slots
+                // Which packets get lost depends on the burst's phase against the radio's
+                // slots, and a pause alone doesn't move it (the request lands on a slot too):
+                // tested on Windows 2026-10-21, a plain retry lost the same packets every time.
+                // A few small requests in front do shift it, so vary how many.
+                for _ in 0..attempt % 4 {
+                    self.ch.write(&p::read_request(p::CMD_PROFILE, 0))?;
+                }
                 sleep(Duration::from_millis(rand::rng().random_range(0..50)));
             }
             self.ch.write(&p::read_request(cmd, sub))?;
@@ -147,6 +162,7 @@ impl Keyboard {
                     return Ok(parts.into_values().flatten().collect());
                 }
             }
+            stall = if parts.len() > before { 0 } else { stall + 1 };
             // a short pause before asking again helps the keyboard catch up
             sleep(Duration::from_millis(150));
         }

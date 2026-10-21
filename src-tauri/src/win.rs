@@ -34,7 +34,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindow
 
 const VENDOR_WIRELESS: u16 = 0x3554;
 const PID_DONGLE: u16 = 0xFA09;
-const PID_BLUETOOTH: u16 = 0xFA07;
+// FA07 is what upstream saw (Linux); an F75 paired with Windows over classic Bluetooth says FA08
+const PID_BLUETOOTH: [u16; 2] = [0xFA07, 0xFA08];
 const VENDOR_WIRED: u16 = 0x258A;
 const PID_WIRED: u16 = 0x010C;
 const VENDOR_USAGE_PAGE: u16 = 0xFF02;
@@ -152,7 +153,7 @@ pub fn find_devices() -> Vec<DeviceInfo> {
                         wired = true;
                     }
                 } else if a.VendorID == VENDOR_WIRELESS
-                    && matches!(a.ProductID, PID_DONGLE | PID_BLUETOOTH)
+                    && (a.ProductID == PID_DONGLE || PID_BLUETOOTH.contains(&a.ProductID))
                     && usage == (VENDOR_USAGE_PAGE, VENDOR_USAGE)
                 {
                     let mode = if a.ProductID == PID_DONGLE { "2.4G dongle" } else { "Bluetooth" };

@@ -7,7 +7,9 @@ work is done here.
 
 - Verified on hardware (2.4G dongle, Windows 11): lighting, per-key, keys, macros, device
   settings, backup/restore, audio lighting, animations, tray, autostart, presets.
-- **Bluetooth (3554:FA07): implemented, never tested on hardware** (commit b539422). What to check:
+- **Bluetooth (3554:FA07 LE / FA08 classic): detection and reads verified on hardware (Windows 10).
+  Reads are slow** (see "Bluetooth reads" below). Writes, animations and audio over Bluetooth
+  are not tested yet. Original test plan:
   1. Pair the F75 in Windows Bluetooth settings, switch it to Bluetooth, run `npm run tauri dev`.
   2. The header badge should say "Bluetooth" and everything should read (slower than 2.4G).
   3. Change a lighting effect (a write) and check it sticks after Refresh.
@@ -31,6 +33,19 @@ work is done here.
 - The firmware's "multicolour" uses a fixed rainbow, so custom-colour animations are streamed
   live (0x88, at most 126 bytes per frame, no ack, the keyboard falls back to its own effect after
   about 2 s).
+
+## Bluetooth reads (measured 2026-10-21, Windows 10)
+
+- The F75 has two Bluetooth radios that Windows lists separately: "AULA-F75 5.0 KB" is LE
+  (`{00001812}`, FA07) and "AULA-F75 3.0 KB" is classic (`{00001124}`, FA08). Pair the 5.0 one.
+- Probe, battery and writes work on both (writes are acknowledged per packet).
+- Multi-packet replies lose most packets: the keyboard sends faster than the link carries.
+  - Classic: 4-5 of 10 arrive, and a plain retry lost the same ones every time. Small profile
+    requests before each retry shift the phase (in `read()`), then about half the reads worked.
+  - LE: 4-7 packets per attempt, at random. With `read()` retrying while new packets still come
+    in (stall limit 25, at most 60 attempts), 18 of 18 full reads worked, 4-40 s each. Reading
+    everything takes about 2 minutes.
+- Upstream's macOS port gave up on Bluetooth reads; its Linux setup uses LE (FA07).
 
 ## How to work here
 
