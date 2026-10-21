@@ -224,6 +224,19 @@ impl Keyboard {
         derr(format!("Read 0x{cmd:02x} over the cable got no matching reply. Try again."))
     }
 
+    /// Write a table over the cable, then read it back to check the keyboard kept it.
+    fn wired_write(&mut self, cmd: u8, read_cmd: u8, sub: u8, data: &[u8]) -> Result<()> {
+        self.wait_keys_released()?;
+        let Some(f) = self.feature.as_mut() else { return derr(NOT_ON_CABLE) };
+        let mut r = p::wired_request(cmd, sub, data.len());
+        r[p::WIRED_HEADER..p::WIRED_HEADER + data.len()].copy_from_slice(data);
+        f.set(&r)?;
+        if self.wired_read(read_cmd, sub, data.len())? != data {
+            return derr("The keyboard didn't keep the change. Try again.");
+        }
+        Ok(())
+    }
+
     /// Write data in 14-byte packets; the keyboard echoes each one back as an ack.
     pub fn write(&mut self, cmd: u8, sub: u8, data: &[u8]) -> Result<()> {
         self.settle(Duration::from_millis(300));
@@ -292,6 +305,9 @@ impl Keyboard {
     }
 
     pub fn set_led(&mut self, led: &p::LedConfig) -> Result<()> {
+        if self.feature.is_some() {
+            return self.wired_write(p::WIRED_WRITE_LED, p::WIRED_READ_LED, 0, &led.0);
+        }
         self.write(p::CMD_SET_LED, 0, &led.0)
     }
 
@@ -458,6 +474,11 @@ mod tests {
 
     impl FeatureChannel for FakeWired {
         fn set(&mut self, report: &p::WiredReport) -> Result<()> {
+            if report[1] == p::WIRED_WRITE_LED {
+                let len = u16::from_le_bytes([report[6], report[7]]) as usize;
+                self.tables.insert((p::WIRED_READ_LED, 0), report[p::WIRED_HEADER..p::WIRED_HEADER + len].to_vec());
+                return Ok(());
+            }
             let mut r = *report;
             let data = self.tables.get(&(report[1], report[2])).cloned().unwrap_or_default();
             r[p::WIRED_HEADER..p::WIRED_HEADER + data.len()].copy_from_slice(&data);
@@ -483,6 +504,17 @@ mod tests {
         assert_eq!(kb.get_matrix(1).unwrap(), p::factory::matrix(1));
         assert_eq!(kb.get_battery().unwrap(), None);
         assert!(kb.get_custom().unwrap_err().0.contains("USB cable"));
-        assert!(kb.set_led(&p::LedConfig::parse(&p::factory::led()).unwrap()).is_err());
+        assert!(kb.set_custom(&p::factory::custom()).is_err());
+    }
+
+    #[test]
+    fn wired_lighting_writes_are_read_back() {
+        let mut tables = BTreeMap::new();
+        tables.insert((p::WIRED_READ_LED, 0), p::factory::led());
+        let mut kb = Keyboard::wired(Box::new(FakeWired { tables, reply: None }), Box::new(NoGuard));
+        let mut led = kb.get_led().unwrap();
+        led.set_effect(2);
+        kb.set_led(&led).unwrap();
+        assert_eq!(kb.get_led().unwrap().effect(), 2);
     }
 }

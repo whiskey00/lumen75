@@ -415,6 +415,9 @@ const WIRED_PAGE: usize = 0x200;
 pub const WIRED_READ_MATRIX: u8 = 0x83; // = 0x41, sub = layer
 pub const WIRED_READ_LED: u8 = 0x84; // = 0x44
 pub const WIRED_READ_PALETTE: u8 = 0x8A; // = 0x49
+/// Writes the lighting block. Applies at once; the keyboard doesn't acknowledge it (a get
+/// after it echoes only the header), so a write is checked by reading back.
+pub const WIRED_WRITE_LED: u8 = 0x04;
 
 pub type WiredReport = [u8; WIRED_REPORT_LEN];
 

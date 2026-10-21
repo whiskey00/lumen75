@@ -262,6 +262,11 @@ struct EffectChange {
 async fn set_effect(state: tauri::State<'_, AppState>, change: EffectChange) -> std::result::Result<Snapshot, String> {
     with_kb(state, move |kb| {
         let Some(e) = p::effect(change.hw) else { return derr(format!("unknown effect {}", change.hw)) };
+        // where the cable keeps the per-key colours isn't known, and unknown effect numbers
+        // have blanked the LEDs there (cloudglides/aula-f75-linux-drivers)
+        if kb.mode == device::Mode::Wired && e.hw == p::CUSTOM_EFFECT {
+            return derr("The per-key effect isn't available over the USB cable yet.");
+        }
         let mut led = kb.get_led()?;
         let mut palette = kb.get_palette()?;
         led.set_effect(e.hw);
