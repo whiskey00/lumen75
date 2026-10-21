@@ -4,9 +4,9 @@ A desktop app for the **AULA F75** keyboard: lighting, per-key RGB, key remappin
 device settings, without the official software. Tauri 2 + React + TypeScript + shadcn/ui, Windows.
 
 Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07` over LE, `3554:FA08` over classic Bluetooth, which is how Windows pairs it). Over the
-**USB cable** (`258A:010C`) it reads lighting, palettes and the keymap and changes lighting and device settings so far;
-custom colours, key remapping, per-key colours, macros, animations and audio lighting still need
-the dongle or Bluetooth.
+**USB cable** (`258A:010C`) it reads lighting, palettes and the keymap, changes lighting and device settings, and runs
+animations and audio lighting so far; custom colours, key remapping, per-key colours and macros
+still need the dongle or Bluetooth.
 
 ## Features
 

@@ -436,6 +436,24 @@ pub fn wired_read_request(cmd: u8, sub: u8) -> WiredReport {
     wired_request(cmd, sub, if cmd == WIRED_READ_LED { LED_LEN } else { WIRED_PAGE })
 }
 
+/// Real-time frame over the cable: one colour per key, at its matrix index (seen on hardware
+/// 2026-10-21). Keys not listed go dark. The header is exactly what
+/// cloudglides/aula-f75-linux-drivers sends and what was tested here; don't vary it: the
+/// official app also uses command 0x08 to write the keyboard's memory. Frames have to keep
+/// coming (about 20 a second there), or the keyboard goes back to its own effect.
+pub fn wired_live_frame(groups: &[(Rgb, Vec<u8>)]) -> WiredReport {
+    const LEDS: usize = 122;
+    let mut b = [0u8; WIRED_REPORT_LEN];
+    b[..WIRED_HEADER].copy_from_slice(&[WIRED_REPORT_ID, 0x08, 0x00, 0x00, 0x01, 0x00, 0x7A, 0x01]);
+    for (rgb, keys) in groups {
+        for &k in keys.iter().filter(|&&k| (k as usize) < LEDS) {
+            let i = WIRED_HEADER + 3 * k as usize;
+            b[i..i + 3].copy_from_slice(rgb);
+        }
+    }
+    b
+}
+
 /// The first `len` data bytes of a reply to `cmd`/`sub`, or None if it answers something else.
 pub fn wired_reply(r: &[u8], cmd: u8, sub: u8, len: usize) -> Option<Vec<u8>> {
     (r.len() >= WIRED_HEADER + len && r[0] == WIRED_REPORT_ID && r[1] == cmd && r[2] == sub)
@@ -572,5 +590,16 @@ mod tests {
         assert_eq!(wired_reply(&r, WIRED_READ_LED, 0, LED_LEN), Some(factory::led()));
         assert_eq!(wired_reply(&r, WIRED_READ_PALETTE, 0, LED_LEN), None);
         assert_eq!(wired_reply(&r, WIRED_READ_LED, 1, LED_LEN), None);
+    }
+
+    // the frame that lit Esc red and Q green on the keyboard (2026-10-21)
+    #[test]
+    fn wired_live_frame_puts_colours_at_matrix_indexes() {
+        let f = wired_live_frame(&[([255, 0, 0], vec![0]), ([0, 255, 0], vec![8]), ([1, 2, 3], vec![200])]);
+        assert_eq!(f[..WIRED_HEADER], hex("06 08 00 00 01 00 7a 01")[..]);
+        assert_eq!(f[8..11], [255, 0, 0]);
+        assert_eq!(f[8 + 24..8 + 27], [0, 255, 0]);
+        assert_eq!(f[8 + 3..8 + 24], [0; 21]); // keys 1-7 dark
+        assert!(f[8 + 3 * 122..].iter().all(|&b| b == 0)); // 200 is past the last LED
     }
 }

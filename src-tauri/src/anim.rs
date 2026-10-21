@@ -288,7 +288,7 @@ pub mod run {
                 was_paused = false;
                 let s = shared2.lock().unwrap().clone();
                 let groups = fit(render(&leds, &s, started.elapsed().as_secs_f32()));
-                let sent = encode(&groups).map_err(|e| e.0).and_then(|f| crate::device::send_frame(&kb, open, &f));
+                let sent = crate::device::send_frame(&kb, open, &groups);
                 match sent {
                     Ok(()) => failures = 0,
                     Err(e) => {

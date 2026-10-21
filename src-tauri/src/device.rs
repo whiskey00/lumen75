@@ -282,13 +282,20 @@ impl Keyboard {
         Ok(false)
     }
 
-    /// Show a real-time frame until the next one arrives. Nothing is stored or acknowledged,
-    /// so a lost packet loses the frame; the gap between packets keeps that rare. Without a
-    /// new frame the keyboard goes back to its own effect after about 2 seconds. Typing keeps
-    /// working while frames stream, so the key guard is skipped (tested upstream).
-    pub fn send_live(&mut self, frame: &[u8]) -> Result<()> {
+    /// Show a real-time frame (colour groups) until the next one arrives. Nothing is stored or
+    /// acknowledged, so a lost packet loses the frame; the gap between packets keeps that rare.
+    /// Without a new frame the keyboard goes back to its own effect after about 2 seconds.
+    /// Typing keeps working while frames stream, so the key guard is skipped (tested upstream).
+    pub fn send_live(&mut self, groups: &[(p::Rgb, Vec<u8>)]) -> Result<()> {
+        if let Some(f) = self.feature.as_mut() {
+            return f.set(&p::wired_live_frame(groups)); // one report, every key's own colour
+        }
+        let frame = p::live_frame(groups)?;
+        if frame.len() > p::LIVE_BUDGET {
+            return derr(format!("frame too long ({} bytes)", frame.len()));
+        }
         let gap = if self.bluetooth() { p::LIVE_GAP_MS_BT } else { p::LIVE_GAP_MS };
-        for pkt in p::split_packets(p::CMD_LIVE, p::LIVE_KEYS, frame) {
+        for pkt in p::split_packets(p::CMD_LIVE, p::LIVE_KEYS, &frame) {
             self.ch.write(&pkt)?;
             sleep(Duration::from_millis(gap));
         }
@@ -377,13 +384,13 @@ impl Keyboard {
 pub fn send_frame(
     kb: &std::sync::Mutex<Option<Keyboard>>,
     open: fn() -> Result<Keyboard>,
-    frame: &[u8],
+    groups: &[(p::Rgb, Vec<u8>)],
 ) -> std::result::Result<(), String> {
     let mut guard = kb.lock().map_err(|_| "keyboard lock poisoned".to_string())?;
     if guard.is_none() {
         *guard = Some(open().map_err(|e| e.0)?);
     }
-    let r = guard.as_mut().unwrap().send_live(frame);
+    let r = guard.as_mut().unwrap().send_live(groups);
     if r.is_err() {
         *guard = None;
     }

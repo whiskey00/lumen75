@@ -20,8 +20,8 @@ type Page = "lighting" | "perkey" | "animations" | "audio" | "keys" | "macros" |
 const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun },
   { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true },
-  { id: "animations", label: "Animations", icon: Sparkles, wireless: true },
-  { id: "audio", label: "Audio", icon: AudioLines, wireless: true },
+  { id: "animations", label: "Animations", icon: Sparkles },
+  { id: "audio", label: "Audio", icon: AudioLines },
   { id: "keys", label: "Keys", icon: KeyboardIcon },
   { id: "macros", label: "Macros", icon: SquareFunction, wireless: true },
   { id: "device", label: "Device", icon: Settings2 },

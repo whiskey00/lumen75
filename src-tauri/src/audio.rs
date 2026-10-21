@@ -403,7 +403,7 @@ pub mod run {
                 };
                 let levels = analyzer.update(&buf, &s).to_vec();
                 let groups = render(&leds, &levels, &s, started.elapsed().as_secs_f32());
-                let sent = encode(&groups).map_err(|e| e.0).and_then(|frame| crate::device::send_frame(&kb, open, &frame));
+                let sent = crate::device::send_frame(&kb, open, &groups);
                 match sent {
                     Ok(()) => failures = 0,
                     Err(e) => {
