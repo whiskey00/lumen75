@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    aula_studio_lib::run()
+    lumen75_lib::run()
 }

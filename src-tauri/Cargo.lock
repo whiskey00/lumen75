@@ -230,23 +230,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
-name = "aula-studio"
-version = "0.1.0"
-dependencies = [
- "cpal",
- "rand",
- "rustfft",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-dialog",
- "tauri-plugin-single-instance",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "auto-launch"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2092,6 +2075,23 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "lumen75"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "rand",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-dialog",
+ "tauri-plugin-single-instance",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "mach2"

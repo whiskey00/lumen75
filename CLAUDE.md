@@ -1,4 +1,6 @@
-# Working notes for AULA Studio
+# Working notes for Lumen75
+
+The app was called AULA Studio until 2026-10-21 (renamed to keep the brand out of the name).
 
 README.md covers features, layout and building. This file covers what's in progress and how
 work is done here.

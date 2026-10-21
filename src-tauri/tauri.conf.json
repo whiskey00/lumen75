@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AULA Studio",
+  "productName": "Lumen75",
   "version": "0.1.0",
-  "identifier": "com.kingk.aulastudio",
+  "identifier": "io.github.whiskey00.lumen75",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1430",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AULA Studio",
+        "title": "Lumen75",
         "width": 1180,
         "height": 820,
         "minWidth": 900,

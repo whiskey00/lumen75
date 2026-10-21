@@ -196,7 +196,7 @@ function AppCard() {
     <Card>
       <CardHeader>
         <CardTitle>App</CardTitle>
-        <CardDescription>Animations and audio lighting run while AULA Studio does.</CardDescription>
+        <CardDescription>Animations and audio lighting run while Lumen75 does.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         <Setting label="Start with Windows" help="Starts hidden in the tray and resumes your animation">

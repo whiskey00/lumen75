@@ -111,7 +111,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
                   </Badge>
                 )}
               </CardTitle>
-              <CardDescription>Streamed from this app, so it shows while AULA Studio runs (also from the tray).</CardDescription>
+              <CardDescription>Streamed from this app, so it shows while Lumen75 runs (also from the tray).</CardDescription>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className={cn(!state.running && "text-foreground font-medium")}>Off</span>

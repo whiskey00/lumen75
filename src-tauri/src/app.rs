@@ -72,6 +72,23 @@ fn config_path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|d| d.join("settings.json"))
 }
 
+/// The app was called AULA Studio (com.kingk.aulastudio) until 2026-10-21. On the first start
+/// under the new name, bring its settings and presets over, and move Start with Windows.
+fn migrate_from_old_name(app: &AppHandle) {
+    let Some(path) = config_path(app) else { return };
+    if path.exists() {
+        return;
+    }
+    let old = path.parent().and_then(|d| d.parent()).map(|d| d.join("com.kingk.aulastudio").join("settings.json"));
+    if let (Some(old), Some(dir)) = (old.filter(|o| o.exists()), path.parent()) {
+        let _ = std::fs::create_dir_all(dir);
+        let _ = std::fs::copy(old, &path);
+    }
+    if crate::win::remove_run_entry("AULA Studio") {
+        let _ = app.autolaunch().enable();
+    }
+}
+
 pub fn load_config(app: &AppHandle) -> AppConfig {
     config_path(app)
         .and_then(|p| std::fs::read_to_string(p).ok())
@@ -374,7 +391,7 @@ pub fn quit(app: &AppHandle) {
 }
 
 fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open AULA Studio", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open Lumen75", true, None::<&str>)?;
     let anim_item = CheckMenuItem::with_id(app, "animation", "Animation", true, animation_on, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -384,7 +401,7 @@ fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?;
     TrayIconBuilder::with_id("main")
         .icon(icon)
-        .tooltip("AULA Studio")
+        .tooltip("Lumen75")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -415,6 +432,7 @@ fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
 /// Load the settings, add the tray icon, show the window unless autostarted, and resume the
 /// animation if it was running when the app last closed.
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
+    migrate_from_old_name(app);
     let config = load_config(app);
     crate::device::set_connection(config.connection);
     let resume = config.animation_on;

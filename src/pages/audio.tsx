@@ -23,7 +23,7 @@ const MODES: { id: AudioMode; label: string; help: string }[] = [
   { id: "pulse", label: "Pulse", help: "The whole board pulses with the bass" },
 ];
 
-const STORE = "aula-studio.audio";
+const STORE = "lumen75.audio";
 const DEFAULTS: AudioSettings = {
   mode: "spectrum",
   gain: 1,

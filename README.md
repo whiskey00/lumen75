@@ -1,6 +1,6 @@
-# AULA Studio
+# Lumen75
 
-A desktop app for the **AULA F75** keyboard: lighting, per-key RGB, key remapping, macros and
+An unofficial desktop app for the **AULA F75** keyboard: lighting, per-key RGB, key remapping, macros and
 device settings, without the official software. Tauri 2 + React + TypeScript + shadcn/ui, Windows.
 
 Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07` over LE, `3554:FA08` over classic Bluetooth, which is how Windows pairs it). Over the

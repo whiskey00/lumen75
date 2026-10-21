@@ -124,9 +124,9 @@ export default function App() {
           <img src="/logo.svg" alt="" className="size-10 shrink-0" />
           <div>
             <div className="text-lg leading-tight font-semibold tracking-tight">
-              AULA <span className="text-muted-foreground font-normal">Studio</span>
+              Lumen<span className="text-muted-foreground font-normal">75</span>
             </div>
-            <div className="text-muted-foreground text-xs">F75</div>
+            <div className="text-muted-foreground text-xs">for AULA F75</div>
           </div>
         </div>
         <nav className="grid gap-1 px-3">

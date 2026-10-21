@@ -18,7 +18,7 @@ use windows_sys::Win32::Devices::HumanInterfaceDevice::{
     HidD_GetProductString, HidD_SetFeature, HidP_GetCaps, HIDD_ATTRIBUTES, HIDP_CAPS,
 };
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GetLastError, ERROR_ACCESS_DENIED, ERROR_IO_PENDING, ERROR_OPERATION_ABORTED, GENERIC_READ, GENERIC_WRITE, HANDLE,
+    CloseHandle, GetLastError, ERROR_ACCESS_DENIED, ERROR_SUCCESS, ERROR_IO_PENDING, ERROR_OPERATION_ABORTED, GENERIC_READ, GENERIC_WRITE, HANDLE,
     INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows_sys::Win32::Storage::FileSystem::{
@@ -29,6 +29,7 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows_sys::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForSingleObject};
 use windows_sys::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
+use windows_sys::Win32::System::Registry::{RegCloseKey, RegDeleteValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyboardLayout};
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
@@ -443,6 +444,21 @@ pub fn vendor_app_running() -> bool {
         }
         CloseHandle(snap);
         found
+    }
+}
+
+/// Remove a Start with Windows entry (HKCU Run) by name. True if there was one.
+pub fn remove_run_entry(name: &str) -> bool {
+    let key: Vec<u16> = r"Software\Microsoft\Windows\CurrentVersion\Run".encode_utf16().chain(Some(0)).collect();
+    let value: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
+    unsafe {
+        let mut h: HKEY = std::ptr::null_mut();
+        if RegOpenKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, KEY_SET_VALUE, &mut h) != ERROR_SUCCESS {
+            return false;
+        }
+        let removed = RegDeleteValueW(h, value.as_ptr()) == ERROR_SUCCESS;
+        RegCloseKey(h);
+        removed
     }
 }
 
