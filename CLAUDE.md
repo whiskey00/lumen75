@@ -1,0 +1,43 @@
+# Working notes for AULA Studio
+
+README.md covers features, layout and building. This file covers what's in progress and how
+work is done here.
+
+## Status (2026-10-21)
+
+- Verified on hardware (2.4G dongle, Windows 11): lighting, per-key, keys, macros, device
+  settings, backup/restore, audio lighting, animations, tray, autostart, presets.
+- **Bluetooth (3554:FA07): implemented, never tested on hardware** (commit b539422). What to check:
+  1. Pair the F75 in Windows Bluetooth settings, switch it to Bluetooth, run `npm run tauri dev`.
+  2. The header badge should say "Bluetooth" and everything should read (slower than 2.4G).
+  3. Change a lighting effect (a write) and check it sticks after Refresh.
+  4. Run an animation and audio lighting. Over Bluetooth, live frames use a 10 ms packet gap
+     (`LIVE_GAP_MS_BT` in `protocol.rs`), which is a guess. If frames flicker or drop, try a
+     bigger gap. If they're smooth, try smaller.
+  5. If the keyboard isn't found at all, print the HID paths (`find_devices()` in `win.rs`).
+     `maybe_aula()` expects the Bluetooth paths to contain `vid&023554` (LE) or `vid&00023554`
+     (classic).
+- Not supported: wired mode (258A:010C, different transport).
+- Battery reading is experimental (first byte of the 0x4A reply).
+- No git remote yet: the owner will add a GitHub repo and push.
+
+## Protocol reference
+
+- The packet format, commands and tables are in the comments in `src-tauri/src/protocol.rs`.
+- The upstream project is aula-f75-hub (MIT, https://github.com/bakiakyol/aula-f75-hub),
+  see its `docs/protocol.md`. Bluetooth there was verified on Linux only.
+- Over Bluetooth, keyboard-to-PC packets get lost a lot (roughly every other one in a burst).
+  Reads retry and collect parts by index. Writes resend unacknowledged packets.
+- The firmware's "multicolour" uses a fixed rainbow, so custom-colour animations are streamed
+  live (0x88, at most 126 bytes per frame, no ack, the keyboard falls back to its own effect after
+  about 2 s).
+
+## How to work here
+
+- Commit after each feature the owner has verified on the keyboard.
+- Run `cargo test` in `src-tauri` and `npx tsc --noEmit` before committing.
+- Installers: `npx tauri build` builds them into `src-tauri/target/release/bundle/{nsis,msi}`.
+  Quit the running app from the tray before reinstalling.
+- Close the official AULA app (OemDrv.exe) first: it uses the same channel.
+- The UI uses shadcn/ui (radix-nova preset) with a forced dark theme. Write UI text in plain,
+  short sentences.
