@@ -57,7 +57,7 @@
 - Test: in `league.rs` `#[cfg(test)] mod tests`
 
 **Interfaces:**
-- Produces: `pub fn fetch() -> Result<Option<String>, String>`: the body of `GET https://127.0.0.1:2999/liveclientdata/allgamedata`, `Ok(None)` when nothing listens (connection refused or timed out: no match), `Err` for anything else (bad certificate, HTTP error other than 404). Timeout 500 ms.
+- Produces: `pub fn fetch() -> Result<Option<String>, String>`: the body of `GET https://127.0.0.1:2999/liveclientdata/allgamedata`, `Ok(None)` when there's no match: connection refused or timed out, any 404, or a body that's an error object (League answers `{"errorCode": ...}` during the loading screen; Aurora treats any reply containing `"error"` the same way). `Err` only for a bad certificate or another HTTP error. Timeout 500 ms.
 
 - [ ] **Step 1:** Download Riot's root certificate from `https://static.developer.riotgames.com/docs/lol/riotgames.pem` into `src-tauri/certs/riotgames.pem`. Check it starts with `-----BEGIN CERTIFICATE-----`. If the URL doesn't serve a certificate, stop and ask the owner.
 - [ ] **Step 2: Write the failing test**
@@ -123,7 +123,7 @@ Classification (who counts as "you" / "your team"):
 - `TurretKilled` / `InhibKilled`: the structure name (`TurretKilled` / `InhibKilled` field) contains `_T1_` (Order's) or `_T2_` (Chaos's); it's yours to celebrate when the structure is the *other* team's → `Turret` / `Inhibitor`.
 - `GameEnd`: `Result` `"Win"` → `Win`, `"Lose"` → `Lose`.
 - Level increase between calls → `LevelUp` (one per call even if several levels).
-- "You" matches any of your `riotId`, `riotIdGameName`, `summonerName` (case-insensitive, ignoring a `#TAG` suffix).
+- "You" matches any of your `riotId`, `riotIdGameName`, `summonerName` (case-insensitive, ignoring a `#TAG` suffix). This matters: since the Riot ID change, parts of the live API have reported names inconsistently (some fields with the `#tag`, some without, `allPlayers` lagging behind; RiotGames/developer-relations issue 857), and Aurora still matches on `summonerName` alone. Look players up in `allPlayers` the same tolerant way.
 
 - [ ] **Step 1: Write the failing tests** (`fixture(name)` reads `tests/fixtures/league/<name>`):
 
@@ -174,7 +174,7 @@ pub fn render(setup: &Setup, snap: &Snapshot, respawn_fraction: f32, active: &mu
 
 Values pinned by the spec and this plan:
 - Default setup: background `Team`; bar health on the number row `1`-`0` (matrix indexes looked up by key name in `keymap::KEYS`), full `[0,255,0]`, empty `[255,0,0]`; bar resource on `f1`-`f12`, full = resource colour (MANA `[0,120,255]`, ENERGY `[255,220,0]`, others `[255,255,255]`, chosen at render time when the bar's `full` is `[0,0,0]`), empty `[0,0,0]`; dead state on, dim `[40,40,40]`, countdown on the number row in `[255,255,255]`; events on: kill, death, multikill, ace, dragon, herald, baron, turret, inhibitor, win, lose; off: assist, firstblood, levelup. Durations 600 ms (flash), 1200 ms (pulse, wave), 3000 ms for win/lose.
-- Team colours: Order `[0,90,255]`, Chaos `[255,40,40]`. Drake colours by `DragonType`: Fire `[255,60,0]`, Water/Ocean `[0,140,255]`, Earth/Mountain `[150,90,30]`, Air/Cloud `[220,240,255]`, Hextech `[0,230,230]`, Chemtech `[60,255,60]`, Elder `[170,60,255]`; unknown → `[255,255,255]`.
+- Team colours: Order `[0,90,255]`, Chaos `[255,40,40]`. Drake colours by `DragonType` (the API's names, as Aurora reads them; compare case-insensitively): `Fire` `[255,60,0]`, `Water` `[0,140,255]`, `Earth` `[150,90,30]`, `Air` `[220,240,255]`, `Hextech` `[0,230,230]`, `Chemtech` `[60,255,60]`, `Elder` `[170,60,255]`; unknown → `[255,255,255]`.
 - Bars: fraction = health/max_health, resource/resource_max, gold/max, (level−1)/17, `respawn_fraction`; keys in list order (reversed when `reverse`); a key is lit with `empty→full` blended by how much of it the fraction covers; unlit keys show `empty`. Resource bar keys go to the background when `resource_kind == "NONE"`.
 - Layers bottom-up: background → bars → dead state (replaces both while `snap.dead`: all keys `dim`, countdown bar over `countdown_keys`) → active effects (flash: whole board in the colour fading out; pulse: whole board brightness `sin` over the duration; wave: a band moving left to right by `Led.x`). Multikill plays `streak − 1` times back to back. A new effect replaces the one playing (finished ones are dropped from `active`).
 - Output: colour groups (keys with identical colours together, black keys omitted).
@@ -231,7 +231,7 @@ pub mod run {
 }
 ```
 
-`run` loop: poll every `SEARCH_MS` while idle and `POLL_MS` while live; feed `Watch`; when the `Tracker` reports `Win` or `Lose`, also call `watch.game_end()`; on `Started` emit `Event::Started` and wait for the app to answer by leaving `step_aside` false (the app decides takeover, below); while `owns_keyboard()`, stream frames at `audio::FPS` (render → `anim::fit` → `send_frame`), errors handled like `anim::run` (report the first and every 30th, wait 500 ms); on `Ended` play the win/lose effect to its end, then emit `Event::Ended`.
+`run` loop: while idle, only poll when `League of Legends.exe` is running (add `pub fn league_running() -> bool` to `win.rs`, the same ToolHelp snapshot as `vendor_app_running`; Aurora does this too), every `SEARCH_MS`; poll and `POLL_MS` while live; feed `Watch`; when the `Tracker` reports `Win` or `Lose`, also call `watch.game_end()`; on `Started` emit `Event::Started` and wait for the app to answer by leaving `step_aside` false (the app decides takeover, below); while `owns_keyboard()`, stream frames at `audio::FPS` (render → `anim::fit` → `send_frame`), errors handled like `anim::run` (report the first and every 30th, wait 500 ms); on `Ended` play the win/lose effect to its end, then emit `Event::Ended`.
 
 App side (`app.rs`), as the spec's handover:
 - `AppConfig` gains `league_on: bool` (default false), `league_setup: gamelight::Setup`, `league_presets: Vec<LeaguePreset { name, setup }>`; `AppState` gains `league: Mutex<Option<match_watch::run::Handle>>` and `league_resume: Mutex<Option<Resume>>` where `enum Resume { Animation, Audio(audio::Settings) }`.
@@ -287,4 +287,5 @@ Page contents (plain short sentences, existing card style):
 - Modify: `README.md` (features: League lighting, cable/dongle only, official data only), `CLAUDE.md` (status: League lighting, not yet verified in a match; where the code lives)
 
 - [ ] **Step 1:** Update both files; commit `git commit -am "League lighting: docs"` (stage only these two files).
-- [ ] **Step 2:** Owner check in a real match (practice tool is fine), on the cable and on the dongle: the switch on; an animation running before the match; the match takes over; health and mana bars move; dying shows the countdown; a kill and a dragon flash; leaving the game brings the animation back; on Bluetooth the status line says why it doesn't run. Record what was verified in `CLAUDE.md` and commit after the owner confirms.
+- [ ] **Step 2:** Before the owner's check, log (debug only) the raw names in the first `ChampionKill` and your `activePlayer` name fields, so a name mismatch is easy to spot.
+- [ ] **Step 3:** Owner check in a real match (practice tool is fine), on the cable and on the dongle: the switch on; an animation running before the match; the match takes over; health and mana bars move; dying shows the countdown; a kill and a dragon flash; leaving the game brings the animation back; on Bluetooth the status line says why it doesn't run. Record what was verified in `CLAUDE.md` and commit after the owner confirms.
