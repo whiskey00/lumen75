@@ -244,6 +244,8 @@ pub struct Presets {
     perkey: Vec<PerkeyPreset>,
     audio: Vec<AudioPreset>,
     league: Vec<LeaguePreset>,
+    /// The ready-made League setups (not saved, not deletable).
+    league_ready: Vec<LeaguePreset>,
 }
 
 fn presets(c: &AppConfig) -> Presets {
@@ -252,6 +254,10 @@ fn presets(c: &AppConfig) -> Presets {
         perkey: c.perkey_presets.clone(),
         audio: c.audio_presets.clone(),
         league: c.league_presets.clone(),
+        league_ready: gamelight::ready_made()
+            .into_iter()
+            .map(|(name, setup)| LeaguePreset { name: name.into(), setup })
+            .collect(),
     }
 }
 

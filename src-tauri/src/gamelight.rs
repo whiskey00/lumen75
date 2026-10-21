@@ -146,17 +146,19 @@ fn keys(names: impl IntoIterator<Item = &'static str>) -> Vec<u8> {
     names.into_iter().filter_map(|n| crate::keymap::KEYS.iter().find(|k| k.name == n).map(|k| k.index)).collect()
 }
 
+/// An event effect with the usual length: 3 s for the result, 0.6 s for a flash, else 1.2 s.
+fn fx(event: Event, on: bool, style: Style, color: Option<Rgb>) -> EventEffect {
+    let ms = match (event, style) {
+        (Event::Win | Event::Lose, _) => 3000,
+        (_, Style::Flash) => 600,
+        _ => 1200,
+    };
+    EventEffect { event, on, style, color, ms }
+}
+
 impl Default for Setup {
     fn default() -> Self {
         use Event::*;
-        let fx = |event, on, style, color: Option<Rgb>| {
-            let ms = match (event, style) {
-                (Win | Lose, _) => 3000,
-                (_, Style::Flash) => 600,
-                _ => 1200,
-            };
-            EventEffect { event, on, style, color, ms }
-        };
         Setup {
             background: Background::default(),
             bars: vec![
@@ -182,6 +184,116 @@ impl Default for Setup {
             ],
         }
     }
+}
+
+const Q_ROW: [&str; 10] = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"];
+const A_ROW: [&str; 10] = ["a", "s", "d", "f", "g", "h", "j", "k", "l", "semicolon"];
+const BOTTOM_ROW: [&str; 10] = ["z", "x", "c", "v", "b", "n", "m", "comma", "period", "slash"];
+
+/// Ready-made setups to start from, offered on the Games page next to your own. At most
+/// three bars each, so a frame keeps its exact colours within the 2.4G frame budget.
+pub fn ready_made() -> Vec<(&'static str, Setup)> {
+    use Event::*;
+    use Style::*;
+    let bar = |value, names: &[&'static str], full, empty, max| Bar {
+        value,
+        keys: keys(names.iter().copied()),
+        full,
+        empty,
+        reverse: false,
+        max,
+    };
+    let solid = |color| Background { kind: BackgroundKind::Solid, color };
+    let dead = |dim, countdown| DeadState { on: true, dim, countdown_keys: keys(NUMBER_ROW), countdown };
+    vec![
+        (
+            // Piltover blue and gold: cool cyan health, gold filling the Q row
+            "Hextech",
+            Setup {
+                background: solid([0, 12, 28]),
+                bars: vec![
+                    bar(Value::Health, &NUMBER_ROW, [0, 230, 190], [90, 0, 20], 0),
+                    bar(Value::Resource, &F_ROW, [0, 0, 0], [0, 10, 30], 0),
+                    bar(Value::Gold, &Q_ROW, [255, 170, 0], [25, 15, 0], 3000),
+                ],
+                dead: dead([8, 0, 18], [170, 60, 255]),
+                events: vec![
+                    fx(Kill, true, Flash, Some([0, 255, 220])),
+                    fx(Death, true, Pulse, Some([200, 0, 40])),
+                    fx(Assist, true, Flash, Some([0, 140, 255])),
+                    fx(FirstBlood, true, Wave, Some([255, 0, 60])),
+                    fx(Multikill, true, Flash, Some([255, 200, 0])),
+                    fx(Ace, true, Wave, Some([0, 255, 220])),
+                    fx(Dragon, true, Wave, None),
+                    fx(Herald, true, Wave, Some([170, 60, 255])),
+                    fx(Baron, true, Wave, Some([170, 60, 255])),
+                    fx(Turret, true, Flash, Some([0, 200, 255])),
+                    fx(Inhibitor, true, Wave, Some([0, 200, 255])),
+                    fx(LevelUp, true, Flash, Some([0, 160, 255])),
+                    fx(Win, true, Wave, Some([255, 190, 0])),
+                    fx(Lose, true, Pulse, Some([120, 0, 30])),
+                ],
+            },
+        ),
+        (
+            // Blood red and black: only fights and objectives light up
+            "Noxian Crimson",
+            Setup {
+                background: solid([25, 0, 0]),
+                bars: vec![
+                    bar(Value::Health, &NUMBER_ROW, [255, 30, 0], [40, 0, 0], 0),
+                    bar(Value::Resource, &F_ROW, [200, 200, 210], [15, 0, 0], 0),
+                    bar(Value::Gold, &BOTTOM_ROW, [255, 120, 0], [30, 8, 0], 3000),
+                ],
+                dead: dead([15, 0, 0], [255, 0, 0]),
+                events: vec![
+                    fx(Kill, true, Flash, Some([255, 60, 0])),
+                    fx(Death, true, Pulse, Some([255, 0, 0])),
+                    fx(Assist, false, Flash, Some([255, 80, 0])),
+                    fx(FirstBlood, true, Wave, Some([255, 0, 0])),
+                    fx(Multikill, true, Wave, Some([255, 0, 0])),
+                    fx(Ace, true, Wave, Some([255, 255, 255])),
+                    fx(Dragon, true, Wave, None),
+                    fx(Herald, true, Wave, Some([160, 0, 255])),
+                    fx(Baron, true, Wave, Some([160, 0, 255])),
+                    fx(Turret, true, Flash, Some([255, 120, 0])),
+                    fx(Inhibitor, true, Flash, Some([255, 120, 0])),
+                    fx(LevelUp, false, Flash, Some([255, 120, 0])),
+                    fx(Win, true, Wave, Some([255, 200, 0])),
+                    fx(Lose, true, Pulse, Some([80, 0, 0])),
+                ],
+            },
+        ),
+        (
+            // Soft pink and lilac, with your level growing along the A row
+            "Spirit Blossom",
+            Setup {
+                background: solid([20, 0, 25]),
+                bars: vec![
+                    bar(Value::Health, &NUMBER_ROW, [255, 120, 200], [60, 0, 30], 0),
+                    bar(Value::Resource, &F_ROW, [120, 200, 255], [10, 0, 15], 0),
+                    bar(Value::Level, &A_ROW, [180, 120, 255], [15, 5, 25], 0),
+                ],
+                dead: dead([10, 0, 14], [255, 180, 230]),
+                events: vec![
+                    fx(Kill, true, Flash, Some([255, 180, 230])),
+                    fx(Death, true, Pulse, Some([120, 0, 80])),
+                    fx(Assist, true, Flash, Some([200, 150, 255])),
+                    fx(FirstBlood, true, Wave, Some([255, 120, 200])),
+                    fx(Multikill, true, Wave, Some([255, 120, 200])),
+                    fx(Ace, true, Wave, Some([255, 255, 255])),
+                    fx(Dragon, true, Wave, None),
+                    fx(Herald, true, Wave, Some([180, 100, 255])),
+                    fx(Baron, true, Wave, Some([180, 100, 255])),
+                    fx(Turret, true, Flash, Some([255, 220, 240])),
+                    fx(Inhibitor, true, Flash, Some([255, 220, 240])),
+                    fx(LevelUp, true, Flash, Some([180, 120, 255])),
+                    fx(Win, true, Wave, Some([255, 200, 240])),
+                    fx(Lose, true, Pulse, Some([90, 0, 60])),
+                ],
+            },
+        ),
+    ]
 }
 
 fn team_color(t: Team) -> Rgb {
@@ -374,6 +486,21 @@ mod tests {
 
     fn game_event(event: Event) -> GameEvent {
         GameEvent { event, streak: 0, dragon: None }
+    }
+
+    #[test]
+    fn ready_made_setups_fit_a_frame_with_their_exact_colours() {
+        for (name, setup) in ready_made() {
+            assert_eq!(setup.events.len(), 14, "{name}");
+            assert!(setup.bars.iter().all(|b| b.keys.len() == 10 || b.keys.len() == 12), "{name}: a bar lost keys");
+            let mut dead = snap();
+            dead.dead = true;
+            for (s, fraction) in [(snap(), 0.0), (dead, 0.4)] {
+                let f = frame(&setup, &s, fraction);
+                let bytes = crate::protocol::live_frame(&f).unwrap().len();
+                assert!(bytes <= crate::protocol::LIVE_BUDGET, "{name}: {bytes} bytes");
+            }
+        }
     }
 
     #[test]

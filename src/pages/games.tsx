@@ -71,11 +71,18 @@ export function GamesPage({ catalog }: { catalog: Catalog }) {
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<Picking>(null);
   const [mine, setMine] = useState<Presets["league"]>([]);
+  const [ready, setReady] = useState<Presets["league_ready"]>([]);
   const pending = useRef<number | null>(null);
 
   useEffect(() => {
     api.leagueGet().then(setState);
-    api.presetsGet().then((p) => setMine(p.league)).catch(() => {});
+    api
+      .presetsGet()
+      .then((p) => {
+        setMine(p.league);
+        setReady(p.league_ready);
+      })
+      .catch(() => {});
     const offs = [
       listen<[number, Rgb][]>("league-frame", (e) => setFrame(e.payload)),
       listen<LeagueState>("league-state", (e) => {
@@ -375,7 +382,32 @@ export function GamesPage({ catalog }: { catalog: Catalog }) {
       </Card>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="grid gap-4 pt-6">
+          <div className="grid gap-2">
+            <Label>Ready-made</Label>
+            <div className="flex flex-wrap gap-2">
+              {ready.map((p) => (
+                <Button
+                  key={p.name}
+                  variant="outline"
+                  onClick={() => {
+                    setPicking(null);
+                    set(p.setup);
+                    toast.success(`Loaded “${p.name}”`, { description: "Change anything, then save it as your own." });
+                  }}
+                >
+                  <span className="flex -space-x-1" aria-hidden>
+                    {[p.setup.background.color, ...p.setup.bars.map((b) => b.full)]
+                      .filter((c) => c.some((v) => v > 0))
+                      .map((c, i) => (
+                        <span key={i} className="border-background size-3 rounded-full border" style={{ background: toHex(c) }} />
+                      ))}
+                  </span>
+                  {p.name}
+                </Button>
+              ))}
+            </div>
+          </div>
           <PresetBar
             title="My League setups"
             saves="this League setup: background, bars, dead state and effects"

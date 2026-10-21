@@ -264,6 +264,8 @@ export interface Presets {
   perkey: { name: string; colors: Rgb[] }[];
   audio: { name: string; settings: AudioSettings }[];
   league: { name: string; setup: LeagueSetup }[];
+  /** Ready-made League setups that come with the app. */
+  league_ready: { name: string; setup: LeagueSetup }[];
 }
 
 export const api = {
