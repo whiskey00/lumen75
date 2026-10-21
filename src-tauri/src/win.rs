@@ -425,6 +425,15 @@ pub fn open_keyboard() -> Result<crate::device::Keyboard> {
 
 /// Is the official AULA app (OemDrv.exe) running? It uses the same channel.
 pub fn vendor_app_running() -> bool {
+    process_running("OemDrv.exe")
+}
+
+/// Is a League match possibly running? Its live data is only looked for then.
+pub fn league_running() -> bool {
+    process_running("League of Legends.exe")
+}
+
+fn process_running(exe: &str) -> bool {
     unsafe {
         let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if bad(snap) {
@@ -436,7 +445,7 @@ pub fn vendor_app_running() -> bool {
         let mut more = Process32FirstW(snap, &mut e) != 0;
         while more {
             let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
-            if String::from_utf16_lossy(&e.szExeFile[..len]).eq_ignore_ascii_case("OemDrv.exe") {
+            if String::from_utf16_lossy(&e.szExeFile[..len]).eq_ignore_ascii_case(exe) {
                 found = true;
                 break;
             }

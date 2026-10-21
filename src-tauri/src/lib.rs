@@ -3,8 +3,11 @@ pub mod anim;
 mod app;
 pub mod audio;
 pub mod device;
+pub mod gamelight;
 pub mod keymap;
+pub mod league;
 pub mod macros;
+pub mod match_watch;
 pub mod protocol;
 #[cfg(windows)]
 pub mod win;
@@ -141,6 +144,15 @@ pub(crate) struct AppState {
     pub(crate) config: Mutex<app::AppConfig>,
     #[cfg(windows)]
     pub(crate) tray_anim: Mutex<Option<tauri::menu::CheckMenuItem<tauri::Wry>>>,
+    #[cfg(windows)]
+    pub(crate) league: Mutex<Option<match_watch::run::Handle>>,
+    /// What League lighting replaced at the start of this match, to bring back at its end.
+    #[cfg(windows)]
+    pub(crate) league_resume: Mutex<Option<app::Resume>>,
+    #[cfg(windows)]
+    pub(crate) league_live: std::sync::atomic::AtomicBool,
+    #[cfg(windows)]
+    pub(crate) league_status: Mutex<Option<String>>,
 }
 
 #[cfg(windows)]
@@ -610,8 +622,17 @@ async fn restore(state: tauri::State<'_, AppState>, folder: String) -> std::resu
 /// "audio-frame" events, problems as "audio-error", the end as "audio-stopped".
 #[cfg(windows)]
 #[tauri::command]
-fn audio_start(app: tauri::AppHandle, state: tauri::State<'_, AppState>, settings: audio::Settings) -> std::result::Result<(), String> {
-    use tauri::Emitter;
+fn audio_start(app: tauri::AppHandle, settings: audio::Settings) -> std::result::Result<(), String> {
+    // your choice wins over League lighting for the rest of a match
+    app::league_step_aside(&app);
+    start_audio(&app, settings)
+}
+
+/// Start (or update) the audio lighting; also used to bring it back after a League match.
+#[cfg(windows)]
+pub(crate) fn start_audio(app: &tauri::AppHandle, settings: audio::Settings) -> std::result::Result<(), String> {
+    use tauri::{Emitter, Manager};
+    let state = app.state::<AppState>();
     let mut slot = state.audio.lock().map_err(|_| "audio lock poisoned".to_string())?;
     if let Some(h) = slot.as_ref() {
         *h.settings.lock().unwrap() = settings;
@@ -623,8 +644,9 @@ fn audio_start(app: tauri::AppHandle, state: tauri::State<'_, AppState>, setting
     // only one thing can stream frames at a time: the audio lighting replaces an animation
     // (stopped without forgetting it, so it comes back with the app)
     if state.anim.lock().map(|a| a.is_some()).unwrap_or(false) {
-        app::stop_animation(&app, true);
+        app::stop_animation(app, true);
     }
+    let app = app.clone();
     let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, move |ev| {
         let _ = match ev {
             audio::run::Event::Frame(f) => app.emit("audio-frame", f),
@@ -704,7 +726,8 @@ pub fn run() {
             reset_keys, save_macro, delete_macro, backup, restore, audio_start, audio_update, audio_stop,
             audio_running, audio_devices, app::anim_get, app::anim_start, app::anim_update, app::anim_stop,
             app::app_settings_get, app::app_settings_set, app::presets_get, app::anim_preset_save,
-            app::perkey_preset_save, app::audio_preset_save, app::preset_delete
+            app::perkey_preset_save, app::audio_preset_save, app::preset_delete, app::league_get, app::league_set,
+            app::league_preset_save
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

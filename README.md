@@ -8,6 +8,12 @@ Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07` over
 animations and audio lighting so far; custom colours, key remapping, per-key colours and macros
 still need the dongle or Bluetooth.
 
+**League of Legends lighting** (Games page): while you play a match, the keyboard shows bars
+(health, mana, gold, level, respawn), a dead state and effects for kills, objectives and the
+result, all customisable and saved as presets. It uses only the match data League shares on your
+PC (Riot's Live Client Data API, so no cooldowns), runs over the USB cable and the 2.4G dongle,
+and brings back your animation or audio lighting when the match ends.
+
 Pick the connection in the header: **Auto** (whichever is there, the cable first), **USB cable**,
 **2.4G dongle** or **Bluetooth**. The choice is saved and used from the next start.
 

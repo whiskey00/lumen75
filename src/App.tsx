@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AudioLines, BatteryFull, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
+import { AudioLines, BatteryFull, Gamepad2, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,14 +15,16 @@ import { MacrosPage } from "@/pages/macros";
 import { DevicePage } from "@/pages/device";
 import { AudioPage } from "@/pages/audio";
 import { AnimationsPage } from "@/pages/animations";
+import { GamesPage } from "@/pages/games";
 
-type Page = "lighting" | "perkey" | "animations" | "audio" | "keys" | "macros" | "device";
+type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "keys" | "macros" | "device";
 
 const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun },
   { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true },
   { id: "animations", label: "Animations", icon: Sparkles },
   { id: "audio", label: "Audio", icon: AudioLines },
+  { id: "games", label: "Games", icon: Gamepad2 },
   // over the cable the macros aren't read (the page needs them) and key writes don't work yet
   { id: "keys", label: "Keys", icon: KeyboardIcon, wireless: true },
   { id: "macros", label: "Macros", icon: SquareFunction, wireless: true },
@@ -221,6 +223,7 @@ export default function App() {
                 {shown === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "animations" && <AnimationsPage catalog={catalog} />}
                 {shown === "audio" && <AudioPage catalog={catalog} />}
+                {shown === "games" && <GamesPage catalog={catalog} />}
                 {shown === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "device" && (

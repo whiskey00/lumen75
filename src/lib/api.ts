@@ -190,10 +190,80 @@ export interface AppSettings {
   connection: Connection;
 }
 
+// ------------------------------------------------------------ League lighting
+
+export type LeagueValue = "health" | "resource" | "gold" | "level" | "respawn";
+export type EffectStyle = "flash" | "pulse" | "wave";
+export type GameEventKind =
+  | "kill"
+  | "death"
+  | "assist"
+  | "firstblood"
+  | "multikill"
+  | "ace"
+  | "dragon"
+  | "herald"
+  | "baron"
+  | "turret"
+  | "inhibitor"
+  | "levelup"
+  | "win"
+  | "lose";
+
+export interface LeagueBackground {
+  kind: "off" | "solid" | "team";
+  color: Rgb;
+}
+
+export interface LeagueBar {
+  value: LeagueValue;
+  /** Matrix indexes, filled in this order. */
+  keys: number[];
+  /** Black on a resource bar: the resource's own colour. */
+  full: Rgb;
+  empty: Rgb;
+  reverse: boolean;
+  /** Full amount, for gold. */
+  max: number;
+}
+
+export interface LeagueDead {
+  on: boolean;
+  dim: Rgb;
+  countdown_keys: number[];
+  countdown: Rgb;
+}
+
+export interface LeagueEffect {
+  event: GameEventKind;
+  on: boolean;
+  style: EffectStyle;
+  /** null for a dragon: the drake's own colour. */
+  color: Rgb | null;
+  ms: number;
+}
+
+export interface LeagueSetup {
+  background: LeagueBackground;
+  bars: LeagueBar[];
+  dead: LeagueDead;
+  events: LeagueEffect[];
+}
+
+export interface LeagueState {
+  on: boolean;
+  setup: LeagueSetup;
+  /** A match is running. */
+  live: boolean;
+  /** Why it isn't lighting the match. */
+  status: string | null;
+}
+
 export interface Presets {
   animations: { name: string; settings: AnimSettings }[];
   perkey: { name: string; colors: Rgb[] }[];
   audio: { name: string; settings: AudioSettings }[];
+  league: { name: string; setup: LeagueSetup }[];
 }
 
 export const api = {
@@ -201,7 +271,10 @@ export const api = {
   animPresetSave: (name: string, settings: AnimSettings) => invoke<Presets>("anim_preset_save", { name, settings }),
   perkeyPresetSave: (name: string, colors: Rgb[]) => invoke<Presets>("perkey_preset_save", { name, colors }),
   audioPresetSave: (name: string, settings: AudioSettings) => invoke<Presets>("audio_preset_save", { name, settings }),
-  presetDelete: (kind: "animation" | "perkey" | "audio", name: string) => invoke<Presets>("preset_delete", { kind, name }),
+  presetDelete: (kind: "animation" | "perkey" | "audio" | "league", name: string) => invoke<Presets>("preset_delete", { kind, name }),
+  leagueGet: () => invoke<LeagueState>("league_get"),
+  leagueSet: (change: { on?: boolean; setup?: LeagueSetup }) => invoke<LeagueState>("league_set", change),
+  leaguePresetSave: (name: string, setup: LeagueSetup) => invoke<Presets>("league_preset_save", { name, setup }),
   animGet: () => invoke<AnimState>("anim_get"),
   animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
   animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),
