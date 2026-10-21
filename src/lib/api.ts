@@ -144,6 +144,8 @@ export interface AudioSettings {
   colors: Rgb[];
   /** Output device to listen to; null = the Windows default. */
   device: string | null;
+  /** 0.05 - 1: how bright the lights get at full level. */
+  brightness: number;
 }
 
 /** One streamed frame: band levels (0..1) and the key colours shown. */

@@ -36,6 +36,7 @@ const DEFAULTS: AudioSettings = {
     [255, 110, 0],
   ],
   device: null,
+  brightness: 1,
 };
 const DEFAULT_DEVICE = "__default__";
 
@@ -195,7 +196,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
 
         <Card>
           <CardContent className="pt-6">
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-3">
               <Level
                 label="Gain"
                 value={settings.gain}
@@ -213,6 +214,15 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
                 step={1}
                 text={String(settings.smoothness)}
                 onChange={(v) => set({ smoothness: v })}
+              />
+              <Level
+                label="Brightness"
+                value={settings.brightness}
+                min={0.05}
+                max={1}
+                step={0.05}
+                text={`${Math.round(settings.brightness * 100)}%`}
+                onChange={(v) => set({ brightness: v })}
               />
             </div>
           </CardContent>

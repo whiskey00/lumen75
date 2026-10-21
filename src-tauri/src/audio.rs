@@ -54,6 +54,13 @@ pub struct Settings {
     /// SteelSeries Sonar play music on a device other than the default.
     #[serde(default)]
     pub device: Option<String>,
+    /// 0.05 - 1: how bright the lights get at full level.
+    #[serde(default = "full_brightness")]
+    pub brightness: f32,
+}
+
+fn full_brightness() -> f32 {
+    1.0
 }
 
 impl Default for Settings {
@@ -66,6 +73,7 @@ impl Default for Settings {
             color: [0, 255, 0],
             colors: Vec::new(),
             device: None,
+            brightness: 1.0,
         }
     }
 }
@@ -265,7 +273,8 @@ pub fn render(leds: &[Led], levels: &[f32], s: &Settings, t: f32) -> Vec<(Rgb, V
             }
         }
     }
-    groups.into_values().filter(|(c, _)| *c != [0, 0, 0]).collect()
+    let dim = s.brightness.clamp(0.05, 1.0);
+    groups.into_values().map(|(c, keys)| (scale(c, dim), keys)).filter(|(c, _)| *c != [0, 0, 0]).collect()
 }
 
 /// Groups -> the frame, within the size that streams reliably.
@@ -557,6 +566,15 @@ mod tests {
         // settings saved before colour lists: the single colour is used
         let old = Settings { colorful: false, color: [0, 0, 255], ..Settings::default() };
         assert!(render(&leds(), &[1.0; 11], &old, 0.0).iter().all(|g| g.0 == [0, 0, 255]));
+    }
+
+    #[test]
+    fn brightness_dims_every_colour() {
+        let half = Settings { colorful: false, colors: vec![[200, 100, 0]], brightness: 0.5, ..Settings::default() };
+        assert!(render(&leds(), &[1.0; 11], &half, 0.0).iter().all(|g| g.0 == [100, 50, 0]));
+        // presets saved before the slider load at full brightness
+        let old: Settings = serde_json::from_str(r#"{"mode":"pulse","gain":1,"smoothness":4,"colorful":true,"color":[0,255,0]}"#).unwrap();
+        assert_eq!(old.brightness, 1.0);
     }
 
     #[test]

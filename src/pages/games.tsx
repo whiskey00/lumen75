@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Info, Plus, Swords, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Crosshair, Info, Plus, Shield, Swords, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,7 +66,65 @@ const F_ROW = ["f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11
 /** Which key list is being picked on the keyboard: a bar's, or the dead state's countdown. */
 type Picking = { bar: number } | "countdown" | null;
 
+type Game = "league";
+
+/** Games coming later: shown so people know what's planned, not clickable yet. */
+const UPCOMING = [
+  { name: "Counter-Strike 2", icon: Crosshair, help: "Health, armour, ammo and the bomb, from Valve's game state data." },
+  { name: "Dota 2", icon: Shield, help: "Health, mana, gold and Roshan, from Valve's game state data." },
+];
+
+/** First the games to choose from, then the chosen game's lighting. */
 export function GamesPage({ catalog }: { catalog: Catalog }) {
+  const [game, setGame] = useState<Game | null>(null);
+  const [league, setLeague] = useState<LeagueState | null>(null);
+
+  useEffect(() => {
+    if (game === null) api.leagueGet().then(setLeague).catch(() => {});
+  }, [game]);
+
+  if (game === "league") return <LeagueLighting catalog={catalog} onBack={() => setGame(null)} />;
+
+  const leagueStatus = !league?.on ? "Off" : league.live ? "Lighting your match" : "On, waiting for a match";
+  return (
+    <div className="grid gap-4">
+      <p className="text-muted-foreground text-sm">Pick a game. Its lighting takes over the keyboard while you play.</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <button type="button" className="text-left" onClick={() => setGame("league")}>
+          <Card className="hover:border-primary/60 h-full transition-colors">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <Swords className="size-6" />
+                <Badge variant={league?.on ? "secondary" : "outline"}>{leagueStatus}</Badge>
+              </div>
+              <CardTitle className="pt-2">League of Legends</CardTitle>
+              <CardDescription>Health, mana and gold bars, a dead state, and effects for kills and objectives.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <span className="flex items-center gap-1 text-sm font-medium">
+                Set up <ChevronRight className="size-4" />
+              </span>
+            </CardContent>
+          </Card>
+        </button>
+        {UPCOMING.map((g) => (
+          <Card key={g.name} className="h-full opacity-60" aria-disabled>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <g.icon className="size-6" />
+                <Badge variant="outline">Coming soon</Badge>
+              </div>
+              <CardTitle className="pt-2">{g.name}</CardTitle>
+              <CardDescription>{g.help}</CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeagueLighting({ catalog, onBack }: { catalog: Catalog; onBack: () => void }) {
   const [state, setState] = useState<LeagueState | null>(null);
   const [frame, setFrame] = useState<[number, Rgb][] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -149,6 +208,11 @@ export function GamesPage({ catalog }: { catalog: Catalog }) {
 
   return (
     <div className="grid gap-4">
+      <div>
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft /> All games
+        </Button>
+      </div>
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="grid gap-1.5">
