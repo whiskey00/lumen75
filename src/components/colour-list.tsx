@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ColourInput } from "@/components/colour-input";
 import { fromHex, Rgb, toHex } from "@/lib/api";
 
 export const MAX_COLOURS = 7;
@@ -10,12 +11,11 @@ export function ColourList({ colors, onChange }: { colors: Rgb[]; onChange: (c: 
     <div className="flex flex-wrap items-center gap-2">
       {colors.map((c, i) => (
         <div key={i} className="group relative">
-          <input
-            type="color"
+          <ColourInput
+            stacked
             value={toHex(c)}
-            onChange={(e) => onChange(colors.map((x, j) => (j === i ? fromHex(e.target.value) : x)))}
-            className="h-11 w-14 cursor-pointer rounded-md border bg-transparent"
-            aria-label={`Colour ${i + 1}`}
+            onChange={(hex) => onChange(colors.map((x, j) => (j === i ? fromHex(hex) : x)))}
+            label={`Colour ${i + 1}`}
           />
           {colors.length > 1 && (
             <button
@@ -32,7 +32,7 @@ export function ColourList({ colors, onChange }: { colors: Rgb[]; onChange: (c: 
         <Button
           variant="outline"
           size="icon"
-          className="h-11 w-14"
+          className="h-11 w-20"
           aria-label="Add a colour"
           onClick={() => onChange([...colors, colors[colors.length - 1] ?? [255, 255, 255]])}
         >

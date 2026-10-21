@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { ColourInput } from "@/components/colour-input";
 import { cn } from "@/lib/utils";
 import { api, Board, Catalog, EffectView, fromHex, toHex } from "@/lib/api";
 import type { Run } from "@/lib/run";
@@ -139,13 +140,7 @@ function EffectSettings({ fx, catalog, busy, run }: { fx: EffectView; catalog: C
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <input
-                type="color"
-                value={picked}
-                onChange={(e) => setPicked(e.target.value)}
-                className="h-9 w-14 cursor-pointer rounded-md border bg-transparent"
-                aria-label="Any colour"
-              />
+              <ColourInput value={picked} onChange={setPicked} label="Any colour" />
               <Button
                 variant="secondary"
                 disabled={busy}

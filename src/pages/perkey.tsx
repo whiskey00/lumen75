@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Keyboard } from "@/components/keyboard";
+import { ColourInput } from "@/components/colour-input";
 import { PresetBar } from "@/components/preset-bar";
 import { cn } from "@/lib/utils";
 import { api, Board, Catalog, fromHex, Presets, Rgb, toHex } from "@/lib/api";
@@ -105,13 +106,7 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 pt-6">
-          <input
-            type="color"
-            value={colour}
-            onChange={(e) => setColour(e.target.value)}
-            className="h-9 w-14 cursor-pointer rounded-md border bg-transparent"
-            aria-label="Colour"
-          />
+          <ColourInput value={colour} onChange={setColour} label="Colour" />
           <div className="flex gap-1.5">
             {SWATCHES.map((s) => (
               <button

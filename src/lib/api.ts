@@ -236,4 +236,11 @@ export const fromHex = (hex: string): Rgb => {
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as Rgb;
 };
 
+/** A typed hex code ("#f80", "ff8800", any case) as "#rrggbb", or null if it isn't one. */
+export const parseHex = (text: string): string | null => {
+  const h = text.trim().replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(h)) return "#" + [...h].map((c) => c + c).join("");
+  return /^[0-9a-f]{6}$/.test(h) ? "#" + h : null;
+};
+
 export const sameEntry = (a: Entry, b: Entry) => a.every((v, i) => v === b[i]);
