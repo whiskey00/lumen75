@@ -1,0 +1,60 @@
+{
+  "activePlayer": {
+    "error": "Spectator mode doesn't currently support this feature"
+  },
+  "allPlayers": [
+    {
+      "championName": "Ahri",
+      "riotId": "Kai#EUW",
+      "riotIdGameName": "Kai",
+      "summonerName": "Kai#EUW",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Garen",
+      "riotId": "Ally#NA1",
+      "riotIdGameName": "Ally",
+      "summonerName": "Ally#NA1",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Zed",
+      "riotId": "Foe#KR1",
+      "riotIdGameName": "Foe",
+      "summonerName": "Foe#KR1",
+      "team": "CHAOS",
+      "isDead": false,
+      "respawnTimer": 0.0
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.05
+      },
+      {
+        "EventID": 1,
+        "EventName": "MinionsSpawning",
+        "EventTime": 65.0
+      },
+      {
+        "EventID": 2,
+        "EventName": "ChampionKill",
+        "EventTime": 300.0,
+        "KillerName": "Kai",
+        "VictimName": "Foe",
+        "Assisters": []
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 400.0
+  }
+}

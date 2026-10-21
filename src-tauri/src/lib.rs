@@ -3,6 +3,7 @@ pub mod anim;
 mod app;
 pub mod audio;
 pub mod device;
+pub mod gamelight;
 pub mod keymap;
 pub mod league;
 pub mod macros;

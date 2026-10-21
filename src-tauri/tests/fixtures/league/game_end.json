@@ -1,0 +1,86 @@
+{
+  "activePlayer": {
+    "riotId": "Kai#EUW",
+    "riotIdGameName": "Kai",
+    "riotIdTagLine": "EUW",
+    "summonerName": "Kai#EUW",
+    "level": 6,
+    "currentGold": 1234.5,
+    "championStats": {
+      "currentHealth": 600.0,
+      "maxHealth": 1200.0,
+      "resourceValue": 150.0,
+      "resourceMax": 300.0,
+      "resourceType": "MANA"
+    }
+  },
+  "allPlayers": [
+    {
+      "championName": "Ahri",
+      "riotId": "Kai#EUW",
+      "riotIdGameName": "Kai",
+      "summonerName": "Kai#EUW",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Garen",
+      "riotId": "Ally#NA1",
+      "riotIdGameName": "Ally",
+      "summonerName": "Ally#NA1",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Zed",
+      "riotId": "Foe#KR1",
+      "riotIdGameName": "Foe",
+      "summonerName": "Foe#KR1",
+      "team": "CHAOS",
+      "isDead": false,
+      "respawnTimer": 0.0
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.05
+      },
+      {
+        "EventID": 1,
+        "EventName": "MinionsSpawning",
+        "EventTime": 65.0
+      },
+      {
+        "EventID": 2,
+        "EventName": "ChampionKill",
+        "EventTime": 300.0,
+        "KillerName": "Kai",
+        "VictimName": "Foe",
+        "Assisters": []
+      },
+      {
+        "EventID": 3,
+        "EventName": "TurretKilled",
+        "EventTime": 900.0,
+        "KillerName": "Ally",
+        "TurretKilled": "Turret_T2_L_03_A",
+        "Assisters": []
+      },
+      {
+        "EventID": 4,
+        "EventName": "GameEnd",
+        "EventTime": 1500.0,
+        "Result": "Win"
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 400.0
+  }
+}

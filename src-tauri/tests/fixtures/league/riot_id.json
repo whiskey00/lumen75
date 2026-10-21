@@ -1,0 +1,72 @@
+{
+  "activePlayer": {
+    "riotId": "Kai#EUW",
+    "riotIdGameName": "Kai",
+    "riotIdTagLine": "EUW",
+    "summonerName": "Kai",
+    "level": 6,
+    "currentGold": 1234.5,
+    "championStats": {
+      "currentHealth": 600.0,
+      "maxHealth": 1200.0,
+      "resourceValue": 150.0,
+      "resourceMax": 300.0,
+      "resourceType": "MANA"
+    }
+  },
+  "allPlayers": [
+    {
+      "championName": "Ahri",
+      "riotId": "KAI#EUW",
+      "riotIdGameName": "Kai",
+      "summonerName": "Kai",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Garen",
+      "riotId": "ALLY#NA1",
+      "riotIdGameName": "Ally",
+      "summonerName": "Ally",
+      "team": "ORDER",
+      "isDead": false,
+      "respawnTimer": 0.0
+    },
+    {
+      "championName": "Zed",
+      "riotId": "FOE#KR1",
+      "riotIdGameName": "Foe",
+      "summonerName": "Foe",
+      "team": "CHAOS",
+      "isDead": false,
+      "respawnTimer": 0.0
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.05
+      },
+      {
+        "EventID": 1,
+        "EventName": "MinionsSpawning",
+        "EventTime": 65.0
+      },
+      {
+        "EventID": 2,
+        "EventName": "ChampionKill",
+        "EventTime": 300.0,
+        "KillerName": "Kai",
+        "VictimName": "Foe",
+        "Assisters": []
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "CLASSIC",
+    "gameTime": 400.0
+  }
+}
