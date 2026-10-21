@@ -282,7 +282,58 @@ export interface Presets {
   league_ready: { name: string; setup: LeagueSetup }[];
 }
 
+export type DiscordIndicator = "in_voice" | "others_speaking" | "speaking" | "muted" | "deafened";
+export type DiscordEvent = "notification" | "joined_voice" | "left_voice" | "user_joined" | "user_left";
+
+export interface DiscordSetup {
+  background: { kind: "off" | "solid"; color: Rgb };
+  indicators: { indicator: DiscordIndicator; on: boolean; keys: number[]; color: Rgb }[];
+  effects: { event: DiscordEvent; on: boolean; style: EffectStyle; color: Rgb; ms: number }[];
+}
+
+export interface DiscordVoice {
+  in_voice: boolean;
+  muted: boolean;
+  deafened: boolean;
+  speaking: boolean;
+  others_speaking: number;
+}
+
+export interface DiscordState {
+  on: boolean;
+  status: string;
+  voice: DiscordVoice;
+  setup: DiscordSetup;
+  client_id: string;
+  has_secret: boolean;
+  signed_in: boolean;
+}
+
+export interface DiscordChange {
+  on?: boolean;
+  setup?: DiscordSetup;
+  clientId?: string;
+  clientSecret?: string;
+}
+
+/** The stream lighting the keyboard; `kind` is also the page it belongs to. */
+export interface Playing {
+  kind: "league" | "animation" | "audio";
+  label: string;
+}
+
+export interface ReadProgress {
+  step: number;
+  total: number;
+  what: string;
+}
+
 export const api = {
+  playing: () => invoke<Playing | null>("playing"),
+  stopPlaying: () => invoke<Playing | null>("stop_playing"),
+  discordGet: () => invoke<DiscordState>("discord_get"),
+  discordSet: (change: DiscordChange) => invoke<DiscordState>("discord_set", { ...change }),
+  discordReconnect: (signOut: boolean) => invoke<DiscordState>("discord_reconnect", { signOut }),
   presetsGet: () => invoke<Presets>("presets_get"),
   animPresetSave: (name: string, settings: AnimSettings) => invoke<Presets>("anim_preset_save", { name, settings }),
   perkeyPresetSave: (name: string, colors: Rgb[]) => invoke<Presets>("perkey_preset_save", { name, colors }),

@@ -432,6 +432,19 @@ pub fn send_frame(
     open: fn() -> Result<Keyboard>,
     groups: &[(p::Rgb, Vec<u8>)],
 ) -> std::result::Result<Vec<(p::Rgb, Vec<u8>)>, String> {
+    // Discord lighting's indicators and effects go over every stream's frames
+    match crate::discord::overlay(groups) {
+        Some(composed) => send_frame_raw(kb, open, &composed),
+        None => send_frame_raw(kb, open, groups),
+    }
+}
+
+/// `send_frame` without Discord's overlay: for Discord's own frames.
+pub fn send_frame_raw(
+    kb: &std::sync::Mutex<Option<Keyboard>>,
+    open: fn() -> Result<Keyboard>,
+    groups: &[(p::Rgb, Vec<u8>)],
+) -> std::result::Result<Vec<(p::Rgb, Vec<u8>)>, String> {
     let mut guard = kb.lock().map_err(|_| "keyboard lock poisoned".to_string())?;
     if guard.is_none() {
         *guard = Some(open().map_err(|e| e.0)?);

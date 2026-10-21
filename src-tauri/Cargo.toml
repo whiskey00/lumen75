@@ -47,6 +47,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_System_SystemInformation",
   "Win32_System_Registry",
+  "Win32_System_Pipes",
 ] }
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

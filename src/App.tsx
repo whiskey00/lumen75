@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AudioLines, BatteryFull, Gamepad2, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Sun, TriangleAlert } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { AudioLines, BatteryFull, Gamepad2, Headphones, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Square, Sun, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { api, Board, Catalog, Connection, merge, Snapshot, Status } from "@/lib/api";
+import { api, Board, Catalog, Connection, merge, Playing, ReadProgress, Snapshot, Status } from "@/lib/api";
 import { LightingPage } from "@/pages/lighting";
 import { PerKeyPage } from "@/pages/perkey";
 import { KeysPage } from "@/pages/keys";
@@ -16,19 +17,25 @@ import { DevicePage } from "@/pages/device";
 import { AudioPage } from "@/pages/audio";
 import { AnimationsPage } from "@/pages/animations";
 import { GamesPage } from "@/pages/games";
+import { DiscordPage } from "@/pages/discord";
 
-type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "keys" | "macros" | "device";
+type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "device";
 
-const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[] = [
-  { id: "lighting", label: "Lighting", icon: Sun },
-  { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true },
+/**
+ * `board`: the page shows what was read from the keyboard, so it waits for the read. The others
+ * (streamed lighting) work at once. `wireless`: not over the USB cable yet.
+ */
+const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; board?: boolean }[] = [
+  { id: "lighting", label: "Lighting", icon: Sun, board: true },
+  { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true, board: true },
   { id: "animations", label: "Animations", icon: Sparkles },
   { id: "audio", label: "Audio", icon: AudioLines },
   { id: "games", label: "Games", icon: Gamepad2 },
+  { id: "discord", label: "Discord", icon: Headphones },
   // over the cable the macros aren't read (the page needs them) and key writes don't work yet
-  { id: "keys", label: "Keys", icon: KeyboardIcon, wireless: true },
-  { id: "macros", label: "Macros", icon: SquareFunction, wireless: true },
-  { id: "device", label: "Device", icon: Settings2 },
+  { id: "keys", label: "Keys", icon: KeyboardIcon, wireless: true, board: true },
+  { id: "macros", label: "Macros", icon: SquareFunction, wireless: true, board: true },
+  { id: "device", label: "Device", icon: Settings2, board: true },
 ];
 
 const CABLE = "USB cable";
@@ -50,6 +57,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>("auto");
+  const [progress, setProgress] = useState<ReadProgress | null>(null);
+  const [playing, setPlaying] = useState<Playing | null>(null);
   const busyRef = useRef(false);
 
   const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => {}), []);
@@ -57,6 +66,7 @@ export default function App() {
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setProgress(null);
     try {
       const s = await api.readAll();
       setBoard(merge(null, s));
@@ -84,6 +94,27 @@ export default function App() {
       return;
     }
     reload();
+  };
+
+  useEffect(() => {
+    const off = listen<ReadProgress>("read-progress", (e) => setProgress(e.payload));
+    return () => void off.then((f) => f());
+  }, []);
+
+  // what's lighting the keyboard (animations, audio, League), for the header
+  useEffect(() => {
+    const check = () => api.playing().then(setPlaying).catch(() => {});
+    check();
+    const t = setInterval(check, 1500);
+    return () => clearInterval(t);
+  }, []);
+
+  const stopPlaying = async () => {
+    try {
+      setPlaying(await api.stopPlaying());
+    } catch (e) {
+      toast.error("Can't stop it", { description: String(e) });
+    }
   };
 
   // device list and the official-app check; the keyboard itself is only touched by commands
@@ -118,6 +149,8 @@ export default function App() {
   const onCable = board?.mode === CABLE;
   // a page the cable can't serve falls back to Lighting
   const shown: Page = onCable && PAGES.find((p) => p.id === page)?.wireless ? "lighting" : page;
+  const waitsForBoard = !!PAGES.find((p) => p.id === shown)?.board && !board;
+  const PLAYING_PAGE: Record<Playing["kind"], Page> = { animation: "animations", audio: "audio", league: "games" };
 
   return (
     <div className="bg-background text-foreground flex h-screen">
@@ -137,8 +170,14 @@ export default function App() {
               key={p.id}
               variant={page === p.id ? "secondary" : "ghost"}
               className="justify-start"
-              disabled={!board || (onCable && p.wireless)}
-              title={onCable && p.wireless ? "Not available over the USB cable yet" : undefined}
+              disabled={onCable && p.wireless}
+              title={
+                onCable && p.wireless
+                  ? "Not available over the USB cable yet"
+                  : p.board && !board
+                    ? "Opens once the keyboard has been read"
+                    : undefined
+              }
               onClick={() => setPage(p.id)}
             >
               <p.icon /> {p.label}
@@ -154,6 +193,25 @@ export default function App() {
         <header className="flex items-center gap-3 border-b px-6 py-3">
           <h1 className="text-base font-medium">{PAGES.find((p) => p.id === shown)?.label}</h1>
           <div className="ml-auto flex items-center gap-2">
+            {playing && (
+              <div className="bg-primary/10 border-primary/30 flex items-center gap-1 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs">
+                <span className="relative flex size-2">
+                  <span className="bg-primary absolute inline-flex size-full animate-ping rounded-full opacity-60" />
+                  <span className="bg-primary relative inline-flex size-2 rounded-full" />
+                </span>
+                <button
+                  type="button"
+                  className="hover:text-foreground text-muted-foreground px-1 font-medium"
+                  onClick={() => setPage(PLAYING_PAGE[playing.kind])}
+                  title="Lighting the keyboard now. Open its page"
+                >
+                  {playing.label}
+                </button>
+                <Button size="icon-xs" variant="ghost" className="rounded-full" onClick={stopPlaying} title="Stop: the keyboard goes back to its own effect">
+                  <Square className="size-3 fill-current" />
+                </Button>
+              </div>
+            )}
             <Select value={connection} onValueChange={(v) => chooseConnection(v as Connection)} disabled={busy || loading}>
               <SelectTrigger size="sm" title="Which connection to use">
                 <SelectValue />
@@ -194,20 +252,31 @@ export default function App() {
               </Alert>
             )}
 
-            {!board && (
+            {waitsForBoard && (
               <Card>
                 <CardHeader>
                   <CardTitle>{loading ? "Reading the keyboard…" : "Can't reach the keyboard"}</CardTitle>
                   <CardDescription>
                     {loading
-                      ? "This takes a few seconds over 2.4G or the cable, and longer over Bluetooth."
+                      ? "This takes a few seconds over 2.4G or the cable, and longer over Bluetooth. Animations, Audio, Games and Discord work meanwhile."
                       : error ??
                         "Plug in the dongle and switch the keyboard to 2.4G, or to Bluetooth once it is paired in Windows settings. Then press a key to wake it. Or plug in the cable with the switch on wired."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <Loader2 className="text-muted-foreground size-6 animate-spin" />
+                    <div className="grid gap-2">
+                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                        <Loader2 className="size-4 animate-spin" />
+                        {progress ? `Reading ${progress.what} (${progress.step} of ${progress.total})` : "Connecting…"}
+                      </div>
+                      <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                        <div
+                          className="bg-primary h-full rounded-full transition-[width] duration-500"
+                          style={{ width: `${progress ? ((progress.step - 0.5) / progress.total) * 100 : 3}%` }}
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <Button onClick={reload}>
                       <RefreshCw /> Try again
@@ -217,13 +286,18 @@ export default function App() {
               </Card>
             )}
 
+            {catalog && (
+              <>
+                {shown === "animations" && <AnimationsPage catalog={catalog} />}
+                {shown === "audio" && <AudioPage catalog={catalog} />}
+                {shown === "games" && <GamesPage catalog={catalog} />}
+                {shown === "discord" && <DiscordPage catalog={catalog} />}
+              </>
+            )}
             {board && catalog && (
               <>
                 {shown === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
-                {shown === "animations" && <AnimationsPage catalog={catalog} />}
-                {shown === "audio" && <AudioPage catalog={catalog} />}
-                {shown === "games" && <GamesPage catalog={catalog} />}
                 {shown === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "device" && (

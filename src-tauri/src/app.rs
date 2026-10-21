@@ -37,6 +37,12 @@ pub struct AppConfig {
     pub league_setup: gamelight::Setup,
     /// Your saved League setups, by name.
     pub league_presets: Vec<LeaguePreset>,
+    /// Discord lighting: connect to the Discord app and light its events.
+    pub discord_on: bool,
+    /// Your Discord application and its sign-in.
+    pub discord_auth: crate::discord::Auth,
+    /// What Discord lighting shows.
+    pub discord_setup: crate::discord::Setup,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +91,9 @@ impl Default for AppConfig {
             league_on: false,
             league_setup: gamelight::Setup::default(),
             league_presets: Vec::new(),
+            discord_on: false,
+            discord_auth: Default::default(),
+            discord_setup: Default::default(),
         }
     }
 }
@@ -269,6 +278,72 @@ pub async fn anim_stop(app: AppHandle) -> Result<AnimState, String> {
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || stop_animation(&a, true)).await.map_err(|e| e.to_string())?;
     Ok(anim_state(&app))
+}
+
+// ------------------------------------------------------------ what's lighting the keyboard
+
+/// The stream lighting the keyboard right now, for the header.
+#[derive(Serialize, Clone, PartialEq)]
+pub struct Playing {
+    /// "league", "animation" or "audio": also the page it belongs to.
+    kind: &'static str,
+    label: String,
+}
+
+fn playing_now(app: &AppHandle) -> Option<Playing> {
+    use std::sync::atomic::Ordering::Relaxed;
+    let state = app.state::<AppState>();
+    let league = state.league.lock().unwrap().as_ref().is_some_and(|h| !h.step_aside.load(Relaxed));
+    if league && state.league_live.load(Relaxed) {
+        return Some(Playing { kind: "league", label: "League of Legends match".into() });
+    }
+    if state.anim.lock().unwrap().is_some() {
+        let kind = state.config.lock().unwrap().animation.kind;
+        let name = match kind {
+            anim::Kind::Stream => "Stream",
+            anim::Kind::Breathing => "Breathing",
+            anim::Kind::Wave => "Wave",
+            anim::Kind::Sparkle => "Sparkle",
+            anim::Kind::Gradient => "Gradient",
+            anim::Kind::Fire => "Fire",
+            anim::Kind::Image => "Image",
+        };
+        return Some(Playing { kind: "animation", label: format!("{name} animation") });
+    }
+    if state.audio.lock().unwrap().is_some() {
+        return Some(Playing { kind: "audio", label: "Audio lighting".into() });
+    }
+    None
+}
+
+#[tauri::command]
+pub fn playing(app: AppHandle) -> Option<Playing> {
+    playing_now(&app)
+}
+
+/// Stop whatever is lighting the keyboard; it goes back to its own effect. League lighting
+/// steps aside for the rest of the match (it stays on for the next one).
+#[tauri::command]
+pub async fn stop_playing(app: AppHandle) -> Result<Option<Playing>, String> {
+    let a = app.clone();
+    tauri::async_runtime::spawn_blocking(move || match playing_now(&a).map(|p| p.kind) {
+        Some("league") => {
+            league_step_aside(&a);
+            notify_league(&a);
+        }
+        Some("animation") => stop_animation(&a, true),
+        Some("audio") => {
+            let handle = a.state::<AppState>().audio.lock().unwrap().take();
+            if let Some(h) = handle {
+                h.stop();
+            }
+            let _ = a.emit("audio-stopped", ());
+        }
+        _ => {}
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(playing_now(&app))
 }
 
 // ------------------------------------------------------------ your presets
@@ -630,6 +705,10 @@ pub fn quit(app: &AppHandle) {
     if let Some(h) = state.audio.lock().unwrap().take() {
         h.stop();
     }
+    let discord = state.discord.lock().unwrap().take();
+    if let Some(h) = discord {
+        h.stop();
+    }
     // taken out first: the watcher may need this lock while it hands back at a match end
     let league = state.league.lock().unwrap().take();
     if let Some(h) = league {
@@ -698,7 +777,162 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     if league {
         start_league(app);
     }
+    if app.state::<AppState>().config.lock().unwrap().discord_on {
+        start_discord(app);
+    }
     Ok(())
+}
+
+// ------------------------------------------------------------ Discord
+
+#[derive(Serialize, Clone)]
+pub struct DiscordState {
+    on: bool,
+    status: String,
+    voice: crate::discord::Voice,
+    setup: crate::discord::Setup,
+    client_id: String,
+    /// A secret is saved (it's never sent back to the page).
+    has_secret: bool,
+    signed_in: bool,
+}
+
+fn discord_state(app: &AppHandle) -> DiscordState {
+    let state = app.state::<AppState>();
+    let c = state.config.lock().unwrap();
+    DiscordState {
+        on: c.discord_on,
+        status: if c.discord_on { state.discord_status.lock().unwrap().clone() } else { "Off.".into() },
+        voice: state.discord_voice.lock().unwrap().clone(),
+        setup: c.discord_setup.clone(),
+        client_id: c.discord_auth.client_id.clone(),
+        has_secret: !c.discord_auth.client_secret.is_empty(),
+        signed_in: !c.discord_auth.refresh_token.is_empty() || !c.discord_auth.access_token.is_empty(),
+    }
+}
+
+fn notify_discord(app: &AppHandle) {
+    let _ = app.emit("discord-state", discord_state(app));
+}
+
+fn start_discord(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut slot = state.discord.lock().unwrap();
+    if slot.is_some() {
+        return;
+    }
+    let (auth, setup) = {
+        let c = state.config.lock().unwrap();
+        (c.discord_auth.clone(), c.discord_setup.clone())
+    };
+    let app2 = app.clone();
+    *slot = Some(crate::discord::run::start(state.kb.clone(), crate::open_keyboard, auth, setup, move |ev| {
+        use crate::discord::run::Event;
+        let state = app2.state::<AppState>();
+        match ev {
+            Event::Status(s) => {
+                *state.discord_status.lock().unwrap() = s;
+                notify_discord(&app2);
+            }
+            Event::Voice(v) => {
+                *state.discord_voice.lock().unwrap() = v;
+                notify_discord(&app2);
+            }
+            Event::Auth(a) => {
+                with_config(&app2, |c| c.discord_auth = a);
+                notify_discord(&app2);
+            }
+            Event::Frame(keys) => {
+                let _ = app2.emit("discord-frame", keys);
+            }
+        }
+    }));
+}
+
+fn stop_discord(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let handle = state.discord.lock().unwrap().take();
+    if let Some(h) = handle {
+        h.stop();
+    }
+    *state.discord_voice.lock().unwrap() = Default::default();
+}
+
+#[tauri::command]
+pub fn discord_get(app: AppHandle) -> DiscordState {
+    discord_state(&app)
+}
+
+/// Change Discord lighting. New app details sign out first (the old sign-in was for another
+/// app) and reconnect; a new setup applies at once.
+#[tauri::command]
+pub async fn discord_set(
+    app: AppHandle,
+    on: Option<bool>,
+    setup: Option<crate::discord::Setup>,
+    client_id: Option<String>,
+    client_secret: Option<String>,
+) -> Result<DiscordState, String> {
+    let restart = client_id.is_some() || client_secret.is_some();
+    let (now_on, setup_now) = with_config(&app, |c| {
+        if let Some(id) = client_id {
+            c.discord_auth = crate::discord::Auth { client_id: id.trim().to_string(), ..c.discord_auth.clone() };
+        }
+        if let Some(secret) = client_secret {
+            c.discord_auth.client_secret = secret.trim().to_string();
+        }
+        if restart {
+            c.discord_auth.access_token.clear();
+            c.discord_auth.refresh_token.clear();
+            c.discord_auth.expires_at = 0;
+        }
+        if let Some(s) = setup {
+            c.discord_setup = s;
+        }
+        if let Some(o) = on {
+            c.discord_on = o;
+        }
+        (c.discord_on, c.discord_setup.clone())
+    });
+    if let Some(h) = app.state::<AppState>().discord.lock().unwrap().as_ref() {
+        *h.setup.lock().unwrap() = setup_now;
+    }
+    let a = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if restart || !now_on {
+            stop_discord(&a);
+        }
+        if now_on {
+            start_discord(&a);
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    notify_discord(&app);
+    Ok(discord_state(&app))
+}
+
+/// Connect again (after declining the approval, say), keeping the app details.
+#[tauri::command]
+pub async fn discord_reconnect(app: AppHandle, sign_out: bool) -> Result<DiscordState, String> {
+    if sign_out {
+        with_config(&app, |c| {
+            c.discord_auth.access_token.clear();
+            c.discord_auth.refresh_token.clear();
+            c.discord_auth.expires_at = 0;
+        });
+    }
+    let a = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        stop_discord(&a);
+        if a.state::<AppState>().config.lock().unwrap().discord_on {
+            start_discord(&a);
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    notify_discord(&app);
+    Ok(discord_state(&app))
 }
 
 /// Window close: keep running in the tray, or quit.

@@ -3,6 +3,7 @@ pub mod anim;
 mod app;
 pub mod audio;
 pub mod device;
+pub mod discord;
 pub mod gamelight;
 pub mod imagelight;
 pub mod keymap;
@@ -154,6 +155,12 @@ pub(crate) struct AppState {
     pub(crate) league_live: std::sync::atomic::AtomicBool,
     #[cfg(windows)]
     pub(crate) league_status: Mutex<Option<String>>,
+    #[cfg(windows)]
+    pub(crate) discord: Mutex<Option<discord::run::Handle>>,
+    #[cfg(windows)]
+    pub(crate) discord_status: Mutex<String>,
+    #[cfg(windows)]
+    pub(crate) discord_voice: Mutex<discord::Voice>,
 }
 
 #[cfg(windows)]
@@ -236,23 +243,48 @@ async fn status(state: tauri::State<'_, AppState>) -> std::result::Result<Status
 
 /// Read everything the UI shows.
 #[tauri::command]
-async fn read_all(state: tauri::State<'_, AppState>) -> std::result::Result<Snapshot, String> {
-    with_kb(state, |kb| {
+async fn read_all(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> std::result::Result<Snapshot, String> {
+    use tauri::Emitter;
+    with_kb(state, move |kb| {
+        // each table is a separate read (slow over Bluetooth), so the page can show progress
+        let wired = kb.mode == device::Mode::Wired;
+        let total = if wired { 5 } else { 7 };
+        let mut step = 0;
+        let mut next = |what: &str| {
+            step += 1;
+            let _ = app.emit("read-progress", ReadProgress { step, total, what: what.into() });
+        };
+        next("lighting");
         let led = kb.get_led()?;
+        next("colours");
         let palette = kb.get_palette()?;
         let mut s = Snapshot { mode: Some(kb.mode), ..Default::default() };
         lighting(&mut s, &led, &palette);
-        s.keymap = Some(vec![entries(&kb.get_matrix(0)?), entries(&kb.get_matrix(1)?)]);
+        next("the keymap");
+        let base = entries(&kb.get_matrix(0)?);
+        next("the Fn layer");
+        s.keymap = Some(vec![base, entries(&kb.get_matrix(1)?)]);
         s.factory_keymap = Some(vec![entries(&p::factory::matrix(0)), entries(&p::factory::matrix(1))]);
+        next("the battery");
         s.battery = Some(kb.get_battery()?);
         // over the cable, where the per-key colours and macros live isn't known yet
-        if kb.mode != device::Mode::Wired {
+        if !wired {
+            next("per-key colours");
             s.custom = Some(p::colors_from_custom(&kb.get_custom()?));
+            next("macros");
             s.macros = Some(macros_view(&kb.get_macro_store()?));
         }
         Ok(s)
     })
     .await
+}
+
+/// How far `read_all` got: table `step` of `total`, now reading `what`.
+#[derive(Serialize, Clone)]
+struct ReadProgress {
+    step: u32,
+    total: u32,
+    what: String,
 }
 
 #[tauri::command]
@@ -728,7 +760,8 @@ pub fn run() {
             audio_running, audio_devices, app::anim_get, app::anim_start, app::anim_update, app::anim_stop,
             app::app_settings_get, app::app_settings_set, app::presets_get, app::anim_preset_save,
             app::perkey_preset_save, app::audio_preset_save, app::preset_delete, app::league_get, app::league_set,
-            app::league_preset_save, app::anim_image_import
+            app::league_preset_save, app::anim_image_import, app::discord_get, app::discord_set,
+            app::discord_reconnect, app::playing, app::stop_playing
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
