@@ -184,7 +184,7 @@ fn distance(a: Rgb, b: Rgb) -> u32 {
 }
 
 /// Merge the two closest-coloured groups until the frame fits the budget (rare).
-fn fit(mut groups: Vec<(Rgb, Vec<u8>)>) -> Vec<(Rgb, Vec<u8>)> {
+pub(crate) fn fit(mut groups: Vec<(Rgb, Vec<u8>)>) -> Vec<(Rgb, Vec<u8>)> {
     let bytes = |g: &[(Rgb, Vec<u8>)]| g.iter().map(|(_, k)| 4 + k.len()).sum::<usize>();
     while groups.len() > 1 && bytes(&groups) > crate::protocol::LIVE_BUDGET {
         let mut best = (0, 1, u32::MAX);
