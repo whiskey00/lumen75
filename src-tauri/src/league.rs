@@ -86,6 +86,15 @@ fn is_error_reply(body: &str) -> bool {
     body.trim_start().starts_with('{') && body.contains("\"errorCode\"")
 }
 
+/// Is the game running? Its live data is only looked for then (a refused connection to a
+/// closed port takes Windows about 2 s).
+pub fn running() -> bool {
+    #[cfg(windows)]
+    return crate::win::league_running();
+    #[cfg(not(windows))]
+    false
+}
+
 /// The live match data, or None when there's no match: nothing listening, a 404, or an
 /// error reply. Err only for a bad certificate or another HTTP error.
 pub fn fetch() -> Result<Option<String>, String> {

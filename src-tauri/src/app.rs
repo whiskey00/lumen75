@@ -1,7 +1,7 @@
 //! App-level things: saved settings, the tray icon, starting with Windows, and the
 //! animations (which stream from the computer, so they live as long as the app does).
 
-use crate::{anim, AppState};
+use crate::{anim, gamelight, match_watch, AppState};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -31,6 +31,24 @@ pub struct AppConfig {
     pub audio_presets: Vec<AudioPreset>,
     /// Which connection to look for: auto, cable, dongle or bluetooth.
     pub connection: crate::device::Connection,
+    /// League lighting: watch for matches and light them.
+    pub league_on: bool,
+    /// What League lighting shows (the current setup).
+    pub league_setup: gamelight::Setup,
+    /// Your saved League setups, by name.
+    pub league_presets: Vec<LeaguePreset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaguePreset {
+    pub name: String,
+    pub setup: gamelight::Setup,
+}
+
+/// What League lighting replaced when a match started.
+pub enum Resume {
+    Animation,
+    Audio(crate::audio::Settings),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +82,9 @@ impl Default for AppConfig {
             perkey_presets: Vec::new(),
             audio_presets: Vec::new(),
             connection: Default::default(),
+            league_on: false,
+            league_setup: gamelight::Setup::default(),
+            league_presets: Vec::new(),
         }
     }
 }
@@ -127,6 +148,7 @@ fn notify(app: &AppHandle) {
 /// only one thing can stream frames at a time.
 pub fn start_animation(app: &AppHandle) {
     let state = app.state::<AppState>();
+    league_step_aside(app); // your choice wins over League lighting for the rest of a match
     if let Some(h) = state.audio.lock().unwrap().take() {
         h.stop();
         let _ = app.emit("audio-stopped", ());
@@ -204,10 +226,16 @@ pub struct Presets {
     animations: Vec<AnimPreset>,
     perkey: Vec<PerkeyPreset>,
     audio: Vec<AudioPreset>,
+    league: Vec<LeaguePreset>,
 }
 
 fn presets(c: &AppConfig) -> Presets {
-    Presets { animations: c.anim_presets.clone(), perkey: c.perkey_presets.clone(), audio: c.audio_presets.clone() }
+    Presets {
+        animations: c.anim_presets.clone(),
+        perkey: c.perkey_presets.clone(),
+        audio: c.audio_presets.clone(),
+        league: c.league_presets.clone(),
+    }
 }
 
 fn clean_name(name: &str) -> Result<String, String> {
@@ -282,10 +310,183 @@ pub fn preset_delete(app: AppHandle, kind: String, name: String) -> Result<Prese
             "animation" => c.anim_presets.retain(|p| p.name.to_lowercase() != n),
             "perkey" => c.perkey_presets.retain(|p| p.name.to_lowercase() != n),
             "audio" => c.audio_presets.retain(|p| p.name.to_lowercase() != n),
+            "league" => c.league_presets.retain(|p| p.name.to_lowercase() != n),
             _ => return Err(format!("unknown preset kind {kind}")),
         }
         Ok(presets(c))
     })
+}
+
+/// Save a League setup under a name (replaces one with the same name).
+#[tauri::command]
+pub fn league_preset_save(app: AppHandle, name: String, setup: gamelight::Setup) -> Result<Presets, String> {
+    let name = clean_name(&name)?;
+    Ok(with_config(&app, |c| {
+        upsert(&mut c.league_presets, LeaguePreset { name, setup }, |p| &p.name);
+        presets(c)
+    }))
+}
+
+// ------------------------------------------------------------ League lighting
+
+#[derive(Serialize, Clone)]
+pub struct LeagueState {
+    on: bool,
+    setup: gamelight::Setup,
+    /// A match is running.
+    live: bool,
+    /// Why it isn't lighting the match, in one line.
+    status: Option<String>,
+}
+
+fn league_state(app: &AppHandle) -> LeagueState {
+    let state = app.state::<AppState>();
+    let c = state.config.lock().unwrap();
+    LeagueState {
+        on: c.league_on,
+        setup: c.league_setup.clone(),
+        live: state.league_live.load(std::sync::atomic::Ordering::Relaxed),
+        status: state.league_status.lock().unwrap().clone(),
+    }
+}
+
+fn notify_league(app: &AppHandle) {
+    let _ = app.emit("league-state", league_state(app));
+}
+
+/// Leave the keyboard to what the owner just started, for the rest of the match: nothing is
+/// brought back at its end.
+pub fn league_step_aside(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if let Some(h) = state.league.lock().unwrap().as_ref() {
+        h.step_aside.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+    *state.league_resume.lock().unwrap() = None;
+}
+
+/// A match started: take the keyboard if it's on the cable or the dongle, remembering what
+/// was streaming. Returns whether League lighting took it.
+fn league_take(app: &AppHandle) -> bool {
+    use crate::device::Mode;
+    let state = app.state::<AppState>();
+    state.league_live.store(true, std::sync::atomic::Ordering::Relaxed);
+    let mode = {
+        let mut kb = state.kb.lock().unwrap();
+        if kb.is_none() {
+            *kb = crate::open_keyboard().ok();
+        }
+        kb.as_ref().map(|k| k.mode)
+    };
+    let status = match mode {
+        None => Some("Can't reach the keyboard, so this match isn't lit.".to_string()),
+        Some(Mode::Bluetooth) => Some("League lighting needs the USB cable or the 2.4G dongle.".to_string()),
+        Some(_) => None,
+    };
+    let take = status.is_none();
+    *state.league_status.lock().unwrap() = status;
+    if take {
+        let anim_running = state.anim.lock().unwrap().is_some();
+        let audio = state.audio.lock().unwrap().take();
+        let resume = if anim_running {
+            stop_animation(app, false);
+            Some(Resume::Animation)
+        } else if let Some(h) = audio {
+            let settings = h.settings.lock().unwrap().clone();
+            h.stop();
+            let _ = app.emit("audio-stopped", ());
+            Some(Resume::Audio(settings))
+        } else {
+            None
+        };
+        *state.league_resume.lock().unwrap() = resume;
+    }
+    notify_league(app);
+    take
+}
+
+/// The match is over: bring back what it replaced.
+fn league_give_back(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    state.league_live.store(false, std::sync::atomic::Ordering::Relaxed);
+    *state.league_status.lock().unwrap() = None;
+    let resume = state.league_resume.lock().unwrap().take();
+    match resume {
+        Some(Resume::Animation) => start_animation(app),
+        Some(Resume::Audio(s)) => {
+            if let Err(e) = crate::start_audio(app, s) {
+                let _ = app.emit("league-error", e);
+            }
+        }
+        None => {}
+    }
+    notify_league(app);
+}
+
+fn start_league(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut slot = state.league.lock().unwrap();
+    if slot.is_some() {
+        return;
+    }
+    let setup = state.config.lock().unwrap().league_setup.clone();
+    let app2 = app.clone();
+    *slot = Some(match_watch::run::start(state.kb.clone(), crate::open_keyboard, setup, move |ev| {
+        use match_watch::run::Event;
+        match ev {
+            Event::Started => return league_take(&app2),
+            Event::Ended => league_give_back(&app2),
+            Event::Frame(keys) => {
+                let _ = app2.emit("league-frame", keys);
+            }
+            Event::Error(e) => {
+                let _ = app2.emit("league-error", e);
+            }
+        }
+        true
+    }));
+}
+
+fn stop_league(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let handle = state.league.lock().unwrap().take();
+    if let Some(h) = handle {
+        h.stop();
+    }
+    // turned off mid-match: hand back as if it ended
+    if state.league_live.load(std::sync::atomic::Ordering::Relaxed) {
+        league_give_back(app);
+    }
+}
+
+#[tauri::command]
+pub fn league_get(app: AppHandle) -> LeagueState {
+    league_state(&app)
+}
+
+/// Turn League lighting on or off, or change its setup (saved, and applied at once).
+#[tauri::command]
+pub async fn league_set(app: AppHandle, on: Option<bool>, setup: Option<gamelight::Setup>) -> Result<LeagueState, String> {
+    with_config(&app, |c| {
+        if let Some(v) = on {
+            c.league_on = v;
+        }
+        if let Some(s) = &setup {
+            c.league_setup = s.clone();
+        }
+    });
+    if let Some(s) = setup {
+        if let Some(h) = app.state::<AppState>().league.lock().unwrap().as_ref() {
+            *h.setup.lock().unwrap() = s;
+        }
+    }
+    if let Some(v) = on {
+        let a = app.clone();
+        tauri::async_runtime::spawn_blocking(move || if v { start_league(&a) } else { stop_league(&a) })
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    notify_league(&app);
+    Ok(league_state(&app))
 }
 
 // ------------------------------------------------------------ app settings
@@ -370,6 +571,9 @@ pub fn quit(app: &AppHandle) {
     if let Some(h) = state.audio.lock().unwrap().take() {
         h.stop();
     }
+    if let Some(h) = state.league.lock().unwrap().take() {
+        h.stop();
+    }
     app.exit(0);
 }
 
@@ -418,6 +622,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let config = load_config(app);
     crate::device::set_connection(config.connection);
     let resume = config.animation_on;
+    let league = config.league_on;
     *app.state::<AppState>().config.lock().unwrap() = config;
     build_tray(app, false)?;
     if !std::env::args().any(|a| a == MINIMIZED_ARG) {
@@ -426,6 +631,9 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     if resume {
         let app = app.clone();
         std::thread::spawn(move || start_animation(&app));
+    }
+    if league {
+        start_league(app);
     }
     Ok(())
 }
@@ -453,6 +661,15 @@ mod tests {
         upsert(&mut list, ("aqua".into(), 2), |p| &p.0);
         upsert(&mut list, ("SUNSET".into(), 3), |p| &p.0); // same name, other case
         assert_eq!(list, vec![("aqua".to_string(), 2), ("SUNSET".to_string(), 3)]);
+    }
+
+    #[test]
+    fn old_settings_without_league_still_load() {
+        let c: AppConfig = serde_json::from_str(r#"{"close_to_tray": false}"#).unwrap();
+        assert!(!c.close_to_tray);
+        assert!(!c.league_on);
+        assert_eq!(c.league_setup, crate::gamelight::Setup::default());
+        assert!(c.league_presets.is_empty());
     }
 
     #[test]

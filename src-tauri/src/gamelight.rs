@@ -237,8 +237,12 @@ pub struct Active {
 }
 
 impl Active {
+    /// Seconds it plays for, repeats included.
+    pub fn ms_total(&self) -> f32 {
+        self.effect.ms as f32 / 1000.0 * self.repeats as f32
+    }
     fn end(&self) -> f32 {
-        self.start + self.effect.ms as f32 / 1000.0 * self.repeats as f32
+        self.start + self.ms_total()
     }
 }
 
