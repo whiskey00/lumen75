@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Key } from "@/lib/api";
 
@@ -13,6 +14,12 @@ interface Props {
   keys: Key[];
   selected: Set<number>;
   onKey?: (index: number, additive: boolean) => void;
+  /**
+   * Hold and drag selection: pressing a key starts a sweep that selects every key the pointer
+   * passes over (with Ctrl/Shift, added to the selection; starting on a selected key with
+   * Ctrl/Shift takes keys out instead). Replaces `onKey` when given.
+   */
+  onSelect?: (next: Set<number>) => void;
   look?: (index: number) => KeyLook;
   /** Keys that can't be selected on this page. */
   disabled?: (index: number) => boolean;
@@ -21,9 +28,46 @@ interface Props {
 const VIEW = { x: 22, y: 22, w: 616, h: 247 };
 const KNOB = { cx: 617, cy: 43, r: 12 };
 
-/** The F75 drawn from the official app's key positions. Click selects; Ctrl/Shift-click adds. */
-export function Keyboard({ keys, selected, onKey, look, disabled }: Props) {
+/** The F75 drawn on a 75% grid. Click selects; Ctrl/Shift-click adds; with `onSelect`, drag to sweep. */
+export function Keyboard({ keys, selected, onKey, onSelect, look, disabled }: Props) {
   const knob = keys.find((k) => k.name === "knob");
+  // the sweep in progress: the selection it builds and whether it adds or takes keys out
+  const sweep = useRef<{ next: Set<number>; remove: boolean } | null>(null);
+  useEffect(() => {
+    const end = () => (sweep.current = null);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("blur", end);
+    };
+  }, []);
+
+  /** Pointer handlers for a key: a click (`onKey`) or the start and path of a sweep (`onSelect`). */
+  const handlers = (index: number, off: boolean | undefined) => {
+    if (off) return {};
+    if (!onSelect) return { onClick: (e: React.MouseEvent) => onKey?.(index, e.ctrlKey || e.shiftKey || e.metaKey) };
+    return {
+      onPointerDown: (e: React.PointerEvent) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const additive = e.ctrlKey || e.shiftKey || e.metaKey;
+        const remove = additive && selected.has(index);
+        const next = new Set(additive ? selected : []);
+        if (remove) next.delete(index);
+        else next.add(index);
+        sweep.current = { next, remove };
+        onSelect(new Set(next));
+      },
+      onPointerEnter: () => {
+        const s = sweep.current;
+        if (!s || s.next.has(index) !== s.remove) return;
+        if (s.remove) s.next.delete(index);
+        else s.next.add(index);
+        onSelect(new Set(s.next));
+      },
+    };
+  };
   return (
     <svg viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} className="w-full select-none" role="group" aria-label="Keyboard">
       <rect x={VIEW.x} y={VIEW.y} width={VIEW.w} height={VIEW.h} rx={12} className="fill-neutral-950 stroke-neutral-800" />
@@ -43,7 +87,7 @@ export function Keyboard({ keys, selected, onKey, look, disabled }: Props) {
               aria-pressed={sel}
               aria-label={k.label}
               className={cn("group", off ? "cursor-not-allowed opacity-40" : "cursor-pointer")}
-              onClick={(e) => !off && onKey?.(k.index, e.ctrlKey || e.shiftKey || e.metaKey)}
+              {...handlers(k.index, off)}
             >
               <rect
                 x={x1}
@@ -89,7 +133,7 @@ export function Keyboard({ keys, selected, onKey, look, disabled }: Props) {
           role="button"
           aria-label="Knob"
           className={cn("group", disabled?.(knob.index) ? "cursor-not-allowed opacity-40" : "cursor-pointer")}
-          onClick={(e) => !disabled?.(knob.index) && onKey?.(knob.index, e.ctrlKey || e.shiftKey || e.metaKey)}
+          {...handlers(knob.index, disabled?.(knob.index))}
         >
           <circle
             {...KNOB}

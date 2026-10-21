@@ -51,14 +51,6 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
       return n;
     });
 
-  const onKey = (index: number, additive: boolean) =>
-    setSelected((prev) => {
-      const next = new Set(additive ? prev : []);
-      if (additive && prev.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-
   return (
     <div className="grid gap-4">
       <Card>
@@ -66,7 +58,8 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
           <div className="grid gap-1.5">
             <CardTitle>Per-key colours</CardTitle>
             <CardDescription>
-              Select keys (Ctrl/Shift-click for more), paint them, then apply. Applying switches the keyboard to the per-key effect.
+              Select keys (hold and drag over several, Ctrl/Shift to add more), paint them, then apply. Applying switches the
+              keyboard to the per-key effect.
             </CardDescription>
           </div>
           {dirty && <Badge variant="secondary">Not applied yet</Badge>}
@@ -75,7 +68,7 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
           <Keyboard
             keys={keys}
             selected={selected}
-            onKey={onKey}
+            onSelect={setSelected}
             look={(i) => {
               const c = draft[i];
               return c && c.some((v) => v) ? { fill: toHex(c) } : {};
