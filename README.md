@@ -72,8 +72,6 @@ npm install
 npm run tauri dev
 ```
 
-The dev server uses port 1430, so it can run next to RAKK Studio (1420).
-
 ```bash
 cd src-tauri && cargo test
 ```
