@@ -148,7 +148,6 @@ fn notify(app: &AppHandle) {
 /// only one thing can stream frames at a time.
 pub fn start_animation(app: &AppHandle) {
     let state = app.state::<AppState>();
-    league_step_aside(app); // your choice wins over League lighting for the rest of a match
     if let Some(h) = state.audio.lock().unwrap().take() {
         h.stop();
         let _ = app.emit("audio-stopped", ());
@@ -198,6 +197,7 @@ pub async fn anim_start(app: AppHandle, settings: anim::Settings) -> Result<Anim
         return Err("The official AULA app (OemDrv.exe) is running. Quit it first (also from the tray).".into());
     }
     with_config(&app, |c| c.animation = settings);
+    league_step_aside(&app); // your choice wins over League lighting for the rest of a match
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || start_animation(&a)).await.map_err(|e| e.to_string())?;
     Ok(anim_state(&app))
@@ -355,7 +355,8 @@ fn notify_league(app: &AppHandle) {
 }
 
 /// Leave the keyboard to what the owner just started, for the rest of the match: nothing is
-/// brought back at its end.
+/// brought back at its end. Only for the owner's own starts (button, tray), not for the app
+/// bringing something back.
 pub fn league_step_aside(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Some(h) = state.league.lock().unwrap().as_ref() {
@@ -571,7 +572,9 @@ pub fn quit(app: &AppHandle) {
     if let Some(h) = state.audio.lock().unwrap().take() {
         h.stop();
     }
-    if let Some(h) = state.league.lock().unwrap().take() {
+    // taken out first: the watcher may need this lock while it hands back at a match end
+    let league = state.league.lock().unwrap().take();
+    if let Some(h) = league {
         h.stop();
     }
     app.exit(0);
@@ -600,6 +603,7 @@ fn build_tray(app: &AppHandle, animation_on: bool) -> tauri::Result<()> {
                     if running {
                         stop_animation(&app, true);
                     } else {
+                        league_step_aside(&app);
                         start_animation(&app);
                     }
                 });

@@ -623,6 +623,8 @@ async fn restore(state: tauri::State<'_, AppState>, folder: String) -> std::resu
 #[cfg(windows)]
 #[tauri::command]
 fn audio_start(app: tauri::AppHandle, settings: audio::Settings) -> std::result::Result<(), String> {
+    // your choice wins over League lighting for the rest of a match
+    app::league_step_aside(&app);
     start_audio(&app, settings)
 }
 
@@ -644,8 +646,6 @@ pub(crate) fn start_audio(app: &tauri::AppHandle, settings: audio::Settings) -> 
     if state.anim.lock().map(|a| a.is_some()).unwrap_or(false) {
         app::stop_animation(app, true);
     }
-    // your choice wins over League lighting for the rest of a match
-    app::league_step_aside(app);
     let app = app.clone();
     let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, move |ev| {
         let _ = match ev {
