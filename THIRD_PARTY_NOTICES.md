@@ -71,8 +71,8 @@ informed the League lighting. No code is copied from it.
 
 AULA and F75 are trademarks of their owner. This project isn't affiliated with, endorsed
 by or supported by AULA. It contains no AULA software or artwork. The keyboard protocol was
-worked out so that this app can work with the keyboard. The key positions in `keymap.rs` are
-coordinates from the official app's layout file.
+worked out so that this app can work with the keyboard. The keyboard drawing is our own: the
+key positions in `keymap.rs` are computed from a plain 75% grid.
 
 ## Libraries
 

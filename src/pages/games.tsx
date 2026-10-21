@@ -410,6 +410,12 @@ export function GamesPage({ catalog }: { catalog: Catalog }) {
         2.4G dongle, takes over when a match starts, and brings back your animation or audio lighting when it ends.
         Start one during a match and League lighting steps aside until the next.
       </p>
+      {/* Riot's developer policy asks for this wording where players see it */}
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially
+        involved in producing or managing Riot Games properties. Riot Games, and all associated properties are
+        trademarks or registered trademarks of Riot Games, Inc.
+      </p>
     </div>
   );
 }
