@@ -103,6 +103,11 @@ MIT, see [LICENSE](LICENSE). The parts from aula-f75-hub stay under its MIT lice
 
 ## Disclaimer
 
+Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games
+or anyone officially involved in producing or managing Riot Games properties. Riot Games, and
+all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+
+
 This is an unofficial, independent project. It isn't affiliated with, endorsed by or
 supported by AULA. AULA and F75 are trademarks of their owner and are used here only to say
 which keyboard this app works with. Use it at your own risk: it writes to the keyboard's

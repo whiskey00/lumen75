@@ -50,6 +50,23 @@ The wired real-time frame header (`wired_live_frame` in `protocol.rs`) matches w
 project sends, and its notes on which effect numbers are safe over the cable were followed.
 No code is copied from it.
 
+## Riot Games (League lighting)
+
+The League lighting reads Riot's Live Client Data API, which League of Legends serves on your
+own computer during a match. `src-tauri/certs/riotgames.pem` is Riot's public root certificate,
+as published in Riot's developer documentation, used only to check that local connection.
+
+Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games
+or anyone officially involved in producing or managing Riot Games properties. Riot Games, and
+all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+
+## Aurora (ideas only, MIT)
+
+<https://github.com/Aurora-RGB/Aurora>
+
+How Aurora handles League's live data (for example treating an error reply as "no match")
+informed the League lighting. No code is copied from it.
+
 ## AULA
 
 AULA and F75 are trademarks of their owner. This project isn't affiliated with, endorsed
