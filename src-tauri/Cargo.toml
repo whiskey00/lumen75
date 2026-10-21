@@ -2,7 +2,8 @@
 name = "aula-studio"
 version = "0.1.0"
 description = "Lighting, per-key RGB, remapping, macros and settings for the AULA F75"
-authors = ["kingk"]
+authors = ["whiskey00"]
+license = "MIT"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

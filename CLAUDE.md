@@ -74,6 +74,9 @@ work is done here.
 - Run `cargo test` in `src-tauri` and `npx tsc --noEmit` before committing.
 - Installers: `npx tauri build` builds them into `src-tauri/target/release/bundle/{nsis,msi}`.
   Quit the running app from the tray before reinstalling.
+- Borrowing code, data or protocol details from another project: credit it in
+  `THIRD_PARTY_NOTICES.md` (with its licence text if code or data is copied). Never commit
+  AULA's own files (program files, firmware, images).
 - Close the official AULA app (OemDrv.exe) first: it uses the same channel.
 - The UI uses shadcn/ui (radix-nova preset) with a forced dark theme. Write UI text in plain,
   short sentences.

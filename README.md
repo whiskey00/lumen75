@@ -84,5 +84,20 @@ Installers: `npm run tauri build` puts an MSI and an NSIS setup in `src-tauri/ta
 
 The protocol, effect numbers, key layout and macro format come from
 [aula-f75-hub](https://github.com/bakiakyol/aula-f75-hub) by Baki Akyol (MIT). Its Python code
-is ported to Rust here, and its factory table dumps are bundled in `src-tauri/factory/` (see
-`NOTICE.md` there). Not affiliated with AULA.
+is ported to Rust here, and its factory table dumps are bundled in `src-tauri/factory/`. The
+wired real-time header follows
+[aula-f75-linux-drivers](https://github.com/cloudglides/aula-f75-linux-drivers). Details are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Built with AI assistance (Claude), then tested by hand on a real F75.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The parts from aula-f75-hub stay under its MIT licence.
+
+## Disclaimer
+
+This is an unofficial, independent project. It isn't affiliated with, endorsed by or
+supported by AULA. AULA and F75 are trademarks of their owner and are used here only to say
+which keyboard this app works with. Use it at your own risk: it writes to the keyboard's
+settings, so make a backup first (Device → Backup).
