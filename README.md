@@ -1,4 +1,8 @@
-# Lumen75
+<p align="center">
+  <img src="app-icon.svg" alt="Lumen75 logo" width="128" height="128">
+</p>
+
+<h1 align="center">Lumen75</h1>
 
 An unofficial desktop app for the **AULA F75** keyboard. You can use it instead of the official
 software for lighting, per-key colours, key remapping, macros and device settings. It adds a
