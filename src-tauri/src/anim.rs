@@ -29,6 +29,9 @@ pub enum Kind {
     Gradient,
     /// A GIF or picture played on the keys (see `imagelight`).
     Image,
+    /// Flames rising from one edge of the board, in your colours: the first colour licks
+    /// at the tips, the last burns at the base, and the hottest core glows almost white.
+    Fire,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,6 +123,55 @@ fn seed(index: u8, salt: u32) -> f32 {
     (x % 10_000) as f32 / 10_000.0
 }
 
+/// Smooth value noise in 0..1: random values on a grid, blended between grid points.
+fn noise(x: f32, y: f32) -> f32 {
+    let hash = |ix: i32, iy: i32| -> f32 {
+        let mut h = (ix as u32).wrapping_mul(374_761_393) ^ (iy as u32).wrapping_mul(668_265_263);
+        h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
+        ((h ^ (h >> 16)) % 10_000) as f32 / 10_000.0
+    };
+    let (ix, iy) = (x.floor() as i32, y.floor() as i32);
+    let (fx, fy) = (x - x.floor(), y - y.floor());
+    let smooth = |f: f32| f * f * (3.0 - 2.0 * f);
+    let (sx, sy) = (smooth(fx), smooth(fy));
+    let top = hash(ix, iy) + (hash(ix + 1, iy) - hash(ix, iy)) * sx;
+    let bottom = hash(ix, iy + 1) + (hash(ix + 1, iy + 1) - hash(ix, iy + 1)) * sx;
+    top + (bottom - top) * sy
+}
+
+/// Two octaves of noise: big slow shapes with finer flicker on top.
+fn fbm(x: f32, y: f32) -> f32 {
+    (noise(x, y) * 2.0 + noise(x * 2.3 + 17.0, y * 2.3 - 5.0)) / 3.0
+}
+
+/// Heat levels a fire frame is drawn with: one colour group each, so even 7 colours fit.
+const FIRE_LEVELS: usize = 8;
+
+/// Fire: how hot (0..1) a key is at time `t`. `base` is the key's distance from the edge the
+/// flames rise from (0 = the edge), `across` its position along that edge.
+fn fire_heat(base: f32, across: f32, t: f32) -> f32 {
+    // each tongue of flame reaches its own, wandering height
+    let reach = 0.25 + 0.85 * fbm(across * 5.0, t * 0.9);
+    let body = (1.0 - base / reach).clamp(0.0, 1.0);
+    // turbulence moving up the flames, stronger towards the tips
+    let swirl = fbm(across * 7.0 + 3.0, base * 5.0 - t * 3.2) - 0.5;
+    // the whole fire breathes a little
+    let breath = 0.92 + 0.08 * (t * 2.3).sin() * (t * 0.7 + across).cos();
+    ((body + swirl * (0.35 + 0.5 * base)) * breath).clamp(0.0, 1.0)
+}
+
+/// The fire's colour at heat `h`: dark, then your colours from the tips (first) to the base
+/// (last), then a near-white core.
+fn fire_color(colors: &[Rgb], h: f32) -> Rgb {
+    let mut stops: Vec<Rgb> = vec![[0, 0, 0]];
+    stops.extend_from_slice(colors);
+    let last = *colors.last().unwrap_or(&[255, 120, 0]);
+    stops.push(mix(last, [255, 245, 220], 0.75));
+    let x = h.clamp(0.0, 1.0) * (stops.len() - 1) as f32;
+    let i = (x as usize).min(stops.len() - 2);
+    mix(stops[i], stops[i + 1], x - i as f32)
+}
+
 /// The frame at time `t` (seconds) as colour groups.
 pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
     let colors: Vec<Rgb> = if s.colors.is_empty() { vec![[255, 255, 255]] } else { s.colors.clone() };
@@ -157,6 +209,24 @@ pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
             bands.insert(0, (c, leds.iter().map(|l| l.index).collect()));
         }
         Kind::Image => {} // drawn by render_image, from the decoded picture
+        Kind::Fire => {
+            let t = t * 0.8;
+            for l in leds {
+                let base = along(l, s.direction);
+                let across = match s.direction {
+                    Direction::Up | Direction::Down => l.x * 2.6, // the board is wide: more tongues
+                    Direction::Left | Direction::Right => l.y,
+                };
+                let heat = fire_heat(base, across, t);
+                // a few fixed heat levels, so the frame keeps its exact colours
+                let level = (heat * FIRE_LEVELS as f32).round() as usize;
+                if level == 0 {
+                    continue;
+                }
+                let c = fire_color(&colors, level as f32 / FIRE_LEVELS as f32);
+                bands.entry(level).or_insert((scale(c, bright), Vec::new())).1.push(l.index);
+            }
+        }
         Kind::Sparkle => {
             let base = scale(color_at(&colors, 0.0), 0.12 * bright);
             let mut twinkles: BTreeMap<usize, (Rgb, Vec<u8>)> = BTreeMap::new();
@@ -361,8 +431,8 @@ pub mod run {
 mod tests {
     use super::*;
 
-    fn kinds() -> [Kind; 5] {
-        [Kind::Stream, Kind::Breathing, Kind::Wave, Kind::Sparkle, Kind::Gradient]
+    fn kinds() -> [Kind; 6] {
+        [Kind::Stream, Kind::Breathing, Kind::Wave, Kind::Sparkle, Kind::Gradient, Kind::Fire]
     }
 
     #[test]
@@ -393,6 +463,29 @@ mod tests {
         // two equal halves merge to their average
         let two = fit(vec![([200, 0, 0], (0..60).collect()), ([0, 0, 100], (60..120).collect())]);
         assert_eq!(two, vec![([100, 0, 50], (0..120).collect())]);
+    }
+
+    #[test]
+    fn fire_burns_hot_at_its_base_and_moves() {
+        let leds = leds();
+        let s = Settings { kind: Kind::Fire, direction: Direction::Up, ..Settings::default() };
+        let space = crate::keymap::key_by_name("space").unwrap().index;
+        for step in 0..40 {
+            let f = render(&leds, &s, step as f32 * 0.25);
+            // the bottom row always burns
+            assert!(f.iter().any(|(_, ks)| ks.contains(&space)), "step {step}: the space bar went dark");
+            assert!(f.len() <= FIRE_LEVELS);
+        }
+        assert_ne!(render(&leds, &s, 0.0), render(&leds, &s, 0.5));
+        // the base is hotter (brighter) than the top on average
+        let total = |row: u8| -> u32 {
+            let f = render(&leds, &s, 3.0);
+            leds.iter()
+                .filter(|l| l.row == row)
+                .map(|l| f.iter().find(|(_, ks)| ks.contains(&l.index)).map_or(0, |(c, _)| c.iter().map(|&v| v as u32).sum()))
+                .sum()
+        };
+        assert!(total(5) > total(0));
     }
 
     #[test]

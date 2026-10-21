@@ -157,7 +157,7 @@ export interface AudioFrame {
   device: string;
 }
 
-export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "image";
+export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "fire" | "image";
 /** How a picture is laid over the board. */
 export type ImageFit = "fill" | "fit" | "stretch";
 export type AnimDirection = "right" | "left" | "up" | "down";

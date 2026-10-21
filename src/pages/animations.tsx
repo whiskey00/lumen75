@@ -22,6 +22,7 @@ const KINDS: { id: AnimKind; label: string; help: string; soon?: boolean }[] = [
   { id: "wave", label: "Wave", help: "A bright crest sweeps over your colours" },
   { id: "sparkle", label: "Sparkle", help: "Keys twinkle in your colours over a dim glow" },
   { id: "gradient", label: "Gradient", help: "Your colours spread across the board, still" },
+  { id: "fire", label: "Fire", help: "Flames rise from one edge, in your colours" },
   { id: "image", label: "Image", help: "Plays a GIF or picture on the keys" },
 ];
 
@@ -108,7 +109,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
 
   const colours = new Map<number, Rgb>(frame?.keys ?? []);
   const isImage = s.kind === "image";
-  const usesDirection = s.kind === "stream" || s.kind === "wave" || s.kind === "gradient";
+  const usesDirection = s.kind === "stream" || s.kind === "wave" || s.kind === "gradient" || s.kind === "fire";
 
   return (
     <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
@@ -123,7 +124,8 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
               variant={s.kind === k.id ? "secondary" : "ghost"}
               className="h-auto flex-col items-start gap-0.5 py-2 text-left whitespace-normal"
               disabled={k.soon}
-              onClick={() => set({ kind: k.id })}
+              // fire rises from the bottom unless you pick another edge
+              onClick={() => set(k.id === "fire" && s.kind !== "fire" ? { kind: k.id, direction: "up" } : { kind: k.id })}
             >
               <span className="flex items-center gap-2">
                 {k.label}
