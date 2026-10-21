@@ -23,7 +23,8 @@ const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[]
   { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true },
   { id: "animations", label: "Animations", icon: Sparkles },
   { id: "audio", label: "Audio", icon: AudioLines },
-  { id: "keys", label: "Keys", icon: KeyboardIcon },
+  // over the cable the macros aren't read (the page needs them) and key writes don't work yet
+  { id: "keys", label: "Keys", icon: KeyboardIcon, wireless: true },
   { id: "macros", label: "Macros", icon: SquareFunction, wireless: true },
   { id: "device", label: "Device", icon: Settings2 },
 ];
