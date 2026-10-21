@@ -269,7 +269,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
 
         <p className="text-muted-foreground flex items-start gap-2 text-xs">
           <Info className="mt-0.5 size-3.5 shrink-0" />
-          Over 2.4G about 14 frames a second get through. Nothing is stored on the keyboard: about 2 seconds after you
+          Over 2.4G about 14 frames a second get through, over Bluetooth about 11. Nothing is stored on the keyboard: about 2 seconds after you
           turn this off it goes back to its own effect.
         </p>
       </div>

@@ -112,13 +112,23 @@ fn caps(h: HANDLE) -> Option<HIDP_CAPS> {
     }
 }
 
+/// Could this HID path be an F75? USB paths say `vid_3554`, but Bluetooth ones say
+/// `vid&023554` (LE) or `vid&00023554` (classic), so only the vendor digits are matched;
+/// the attributes decide.
+fn maybe_aula(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    let Some(vid) = lower.find("vid") else { return false };
+    let tail = &lower[vid..];
+    let tail = &tail[..tail.find("pid").unwrap_or(tail.len())];
+    tail.contains("3554") || tail.contains("258a")
+}
+
 /// The configuration channel of each wireless F75, and a wired one (unsupported) once.
 pub fn find_devices() -> Vec<DeviceInfo> {
     let mut found = Vec::new();
     let mut wired = false;
     for path in interface_paths() {
-        let lower = path.to_lowercase();
-        if !lower.contains("vid_3554") && !lower.contains("vid_258a") {
+        if !maybe_aula(&path) {
             continue;
         }
         // opened without read/write access: works even for collections Windows keeps for itself
@@ -380,5 +390,20 @@ pub fn detect_layout() -> crate::macros::Layout {
         } else {
             crate::macros::Layout::Us
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::maybe_aula;
+
+    #[test]
+    fn finds_usb_and_bluetooth_paths() {
+        assert!(maybe_aula(r"\\?\hid#vid_3554&pid_fa09&mi_01&col06#8&2c132f91&0&0005#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
+        assert!(maybe_aula(r"\\?\hid#{00001812-0000-1000-8000-00805f9b34fb}_dev_vid&023554_pid&fa07_rev&0001_e4b1c2a3d4f5&col03#9&1a2b3c4d&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
+        assert!(maybe_aula(r"\\?\hid#{00001124-0000-1000-8000-00805f9b34fb}_vid&00023554_pid&fa07&col03#8&2f2e3d4c&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
+        assert!(maybe_aula(r"\\?\hid#vid_258a&pid_010c&mi_01&col05#8&1&0&0004#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
+        // another vendor whose product id happens to be 3554
+        assert!(!maybe_aula(r"\\?\hid#vid_046d&pid_3554#8&1&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
     }
 }

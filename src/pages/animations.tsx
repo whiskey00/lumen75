@@ -192,7 +192,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
         <p className="text-muted-foreground flex items-start gap-2 text-xs">
           <Info className="mt-0.5 size-3.5 shrink-0" />
           The keyboard can't store animations like these: its own multicolour effects use a fixed rainbow. So this
-          streams about 14 frames a second, pauses when the computer is idle (see Device → App), and the keyboard shows
+          streams about 14 frames a second (about 11 over Bluetooth), pauses when the computer is idle (see Device → App), and the keyboard shows
           its own effect again about 2 seconds after the app stops.
         </p>
       </div>

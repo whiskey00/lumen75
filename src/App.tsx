@@ -155,8 +155,8 @@ export default function App() {
                   <CardTitle>{loading ? "Reading the keyboard…" : "Can't reach the keyboard"}</CardTitle>
                   <CardDescription>
                     {loading
-                      ? "This takes a few seconds over 2.4G."
-                      : error ?? "Plug in the dongle, switch the keyboard to 2.4G or Bluetooth and press a key to wake it."}
+                      ? "This takes a few seconds over 2.4G, and longer over Bluetooth."
+                      : error ?? "Plug in the dongle and switch the keyboard to 2.4G, or to Bluetooth once it is paired in Windows settings. Then press a key to wake it."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

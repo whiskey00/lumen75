@@ -164,9 +164,11 @@ impl Keyboard {
         self.settle(Duration::from_millis(300));
         self.wait_keys_released()?;
         self.ch.drain()?;
+        // over Bluetooth acks get lost on the way back too, so a packet is resent more often
+        let retries = if self.bluetooth() { 8 } else { 5 };
         for pkt in p::split_packets(cmd, sub, data) {
             let mut acked = false;
-            for attempt in 0..5 {
+            for attempt in 0..retries {
                 if attempt > 0 {
                     sleep(Duration::from_millis(100 * attempt));
                     self.ch.drain()?;
@@ -207,9 +209,10 @@ impl Keyboard {
     /// new frame the keyboard goes back to its own effect after about 2 seconds. Typing keeps
     /// working while frames stream, so the key guard is skipped (tested upstream).
     pub fn send_live(&mut self, frame: &[u8]) -> Result<()> {
+        let gap = if self.bluetooth() { p::LIVE_GAP_MS_BT } else { p::LIVE_GAP_MS };
         for pkt in p::split_packets(p::CMD_LIVE, p::LIVE_KEYS, frame) {
             self.ch.write(&pkt)?;
-            sleep(Duration::from_millis(p::LIVE_GAP_MS));
+            sleep(Duration::from_millis(gap));
         }
         self.ch.drain()
     }

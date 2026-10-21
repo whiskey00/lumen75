@@ -37,6 +37,9 @@ pub const LIVE_MAX: usize = 200;
 pub const LIVE_BUDGET: usize = 126;
 /// ms between packets: closer together, the keyboard drops frames (tested upstream).
 pub const LIVE_GAP_MS: u64 = 5;
+/// The same over Bluetooth: about one packet per radio connection interval (not yet
+/// tested on hardware; a full frame then takes ~90 ms, so streams run at ~11 frames/s).
+pub const LIVE_GAP_MS_BT: u64 = 10;
 
 pub const MATRIX_LEN: usize = 126;
 pub const MATRIX_BYTES: usize = MATRIX_LEN * 4; // 504
