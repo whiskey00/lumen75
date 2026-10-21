@@ -1,88 +1,132 @@
 # Lumen75
 
-An unofficial desktop app for the **AULA F75** keyboard: lighting, per-key RGB, key remapping, macros and
-device settings, without the official software. Tauri 2 + React + TypeScript + shadcn/ui, Windows.
+An unofficial desktop app for the **AULA F75** keyboard. You can use it instead of the official
+software for lighting, per-key colours, key remapping, macros and device settings. It adds a
+few things the official app can't do: animations in your own colours, lighting that follows your
+music, and lighting that reacts to League of Legends matches.
 
-Works over the **2.4G dongle** (`3554:FA09`) and **Bluetooth** (`3554:FA07` over LE, `3554:FA08` over classic Bluetooth, which is how Windows pairs it). Over the
-**USB cable** (`258A:010C`) it reads lighting, palettes and the keymap, changes lighting and device settings, and runs
-animations and audio lighting so far; custom colours, key remapping, per-key colours and macros
-still need the dongle or Bluetooth.
+Windows only for now. Built with Tauri 2, Rust, React, TypeScript and shadcn/ui.
 
-**League of Legends lighting** (Games page): while you play a match, the keyboard shows bars
-(health, mana, gold, level, respawn), a dead state and effects for kills, objectives and the
-result, all customisable and saved as presets. It uses only the match data League shares on your
-PC (Riot's Live Client Data API, so no cooldowns), runs over the USB cable and the 2.4G dongle,
-and brings back your animation or audio lighting when the match ends.
+> Close the official AULA app before using Lumen75. Both talk to the keyboard over the same
+> channel, and Lumen75 warns you when the official app is running.
 
-Pick the connection in the header: **Auto** (whichever is there, the cable first), **USB cable**,
-**2.4G dongle** or **Bluetooth**. The choice is saved and used from the next start.
+## Connections
+
+The F75 has a switch on the back for three connections. Lumen75 supports all three. Pick one in
+the app's header, or leave it on **Auto** (it tries the cable first). Your choice is saved.
+
+| Connection | ID | Notes |
+| --- | --- | --- |
+| 2.4G dongle | `3554:FA09` | The most tested connection. Everything works. |
+| Bluetooth | `3554:FA07` (LE), `3554:FA08` (classic) | Pair **"AULA-F75 5.0"** in Windows Bluetooth settings. Reading the keyboard is slow (about 2 minutes for everything), because many reply packets get lost over Bluetooth. |
+| USB cable | `258A:010C` | Uses a different protocol. Lighting, device settings and streamed effects work. The rest isn't worked out yet. |
 
 ## Features
 
-- **Lighting**: the 16 firmware effects with brightness (0-9), speed (0-4) and colour. Any RGB
-  colour, written into the effect's palette, and factory colours back with one click.
-- **Per-key**: paint keys on the drawn keyboard (groups such as WASD, arrows and F-keys), then
-  apply. This switches the keyboard to the per-key effect. Save layouts as your own presets.
-- **Keys**: remap any key on the base or Fn layer to a key, a key combo or a modifier, run a
-  macro from it, disable it, or reset it to its factory function. Every change is read back and
-  checked.
-- **Macros**: steps such as `text:Hello`, `ctrl+c`, `wait:100` and `down:shift`, stored on the
-  keyboard and assigned to a key (run N times, while held, or until a key is pressed). Text is
-  typed for the computer's layout (US or Turkish Q).
-- **Audio**: the lights follow whatever the computer plays (Spectrum, Mirror, Ripple, Pulse),
-  with gain, smoothness, rainbow or your own colours (1-7), your own saved presets, and a choice
-  of output device. Audio is
-  captured with WASAPI loopback, so no microphone is needed. Frames stream with the real-time
-  command `0x88`, about 14 a second over 2.4G. Nothing is stored on the keyboard.
-- **Animations**: Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7,
-  with presets), plus speed, brightness and direction. Save whole animations as your own presets. The F75's own multicolour effects use a
-  fixed rainbow that ignores the colour palettes (tested), so these stream from the app like the
-  audio lighting. They pause when the computer is idle, so the keyboard can sleep.
-- **Tray and Start with Windows**: closing the window keeps the app in the tray (Open,
-  Animation on/off, Quit). Autostart starts it hidden and resumes your last animation.
-- **Device**: side light, knob mode, OS mode, Windows-key lock and sleep timer. Battery level
-  (experimental).
-- **Backup / restore**: same hex files as `aula backup` / `aula restore`, so backups work with
-  both tools.
+✅ works, tested on the keyboard · 🧪 built, not tested yet · ⚠️ works, with limits ·
+❌ not available yet · — doesn't apply
 
-Close the official AULA app first. It uses the same channel, and the app warns when it's running.
+| Feature | What it does | 2.4G | Bluetooth | Cable |
+| --- | --- | :-: | :-: | :-: |
+| **Lighting effects** | The 16 built-in effects, with brightness (0-9), speed (0-4) and colour | ✅ | 🧪 | ✅ |
+| **Custom colours** | Any RGB colour for an effect, and factory colours back with one click | ✅ | 🧪 | ❌ |
+| **Per-key colours** | Paint keys on a drawn keyboard (with groups like WASD, arrows and F-keys), and save layouts as presets | ✅ | 🧪 | ❌ |
+| **Key remapping** | Remap any key on the base or Fn layer to a key, a combo, a modifier or a macro, disable it, or reset it. Every change is read back and checked | ✅ | 🧪 | ❌ |
+| **Macros** | Steps like `text:Hello`, `ctrl+c`, `wait:100`, stored on the keyboard. Run N times, while held, or until a key is pressed. Text is typed for your layout (US or Turkish Q) | ✅ | 🧪 | ❌ |
+| **Animations** | Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7), with speed, brightness, direction and presets | ✅ | 🧪 | ✅ |
+| **Audio lighting** | The lights follow whatever your PC plays (Spectrum, Mirror, Ripple, Pulse), with gain, smoothness, rainbow or your own colours, presets and a choice of output device. No microphone needed | ✅ | 🧪 | ✅ |
+| **League of Legends lighting** | During a match: bars for health, mana, gold, level and respawn, a dead state, and effects for kills, objectives and the result. All customisable, with presets | 🧪 | — | 🧪 |
+| **Device settings** | Side light, knob mode, OS mode, Windows-key lock and sleep timer | ✅ | 🧪 | ✅ |
+| **Battery level** | Shown in the header | ⚠️ | ⚠️ | — |
+| **Backup and restore** | Saves and restores everything as hex files, compatible with `aula backup` / `aula restore` from aula-f75-hub | ✅ | ⚠️ | ❌ |
+| **Tray and Start with Windows** | Closing the window keeps the app in the tray (Open, Animation on/off, Quit). Starts hidden with Windows and resumes your last animation | ✅ | ✅ | ✅ |
+
+Notes:
+
+- **Animations, audio and League lighting stream from the app.** Nothing is stored on the
+  keyboard, so they only run while Lumen75 is running (also from the tray). About 2 seconds
+  after the app stops, the keyboard goes back to its own effect. About 14 frames a second get
+  through over 2.4G, and about 11 over Bluetooth. Animations pause when the PC is idle, so the
+  keyboard can sleep.
+- **Why stream at all?** The F75's own multicolour effects use a fixed rainbow and ignore the
+  colour palettes (tested). Streaming is the only way to get animations in your own colours.
+- **Battery** is experimental: it's the first byte of the keyboard's status reply, and it read
+  100 at full charge. It hasn't been checked at lower charge.
+- **Backup over Bluetooth** works but takes a few minutes, for the slow reads.
+- **League lighting** uses only the match data League itself shares on your PC (Riot's Live
+  Client Data API). It doesn't read the game's memory or touch the game itself. It
+  can't show cooldowns, because League doesn't share them. It doesn't run over Bluetooth, which
+  is too slow for it. After a match it brings back your animation or audio lighting.
+
+## Possible next features
+
+These are possible with what's known about the keyboard, but not built yet.
+
+| Feature | What it would do | What it needs |
+| --- | --- | --- |
+| **Full cable support** | Custom colours, per-key colours, key remapping and macros over the USB cable | Finding the cable's write commands for those tables. The read commands are already known |
+| **Faster Bluetooth** | Read the keyboard in seconds instead of minutes | A smarter way to ask for only the missing packets |
+| **Typing effects** | Keys light up as you press them, with ripples or fading trails | Watching key presses on the PC and streaming frames. Possible now |
+| **Screen ambience** | The keyboard takes the colours of your screen, like an ambient TV light | Screen capture, then the same streaming as audio lighting |
+| **Per-app profiles** | Switch lighting automatically when a game or app comes to the front | Watching the focused window. Possible now |
+| **More games** | Lighting for CS2 and Dota 2 | Valve's Game State Integration, which works like League's local data |
+| **Status lights** | Light a key for Caps Lock, a muted microphone or a new notification | Reading those states on Windows, on top of other lighting |
+| **Low-battery alert** | A notification before the keyboard runs out | Confirming the battery reading at low charge first |
+| **Other AULA keyboards** | Support for the F87, F99 and others | Captures from those keyboards. They likely use the same protocol |
+| **Linux and macOS** | Lumen75 on other systems | A HID backend for each. The rest of the app is cross-platform |
+
+Not planned: firmware updates. Flashing the wrong firmware can brick the keyboard.
 
 ## How it works
 
-`src-tauri/src/`:
+The Rust side (`src-tauri/src/`):
 
-- `protocol.rs`: 20-byte packets (report `0x13`, 14-byte chunks, checksum), the 128-byte LED
-  and settings block, palettes, the per-key table, keymap entries.
-- `device.rs`: reads (reassembled by packet index, retried) and writes (every packet echoed as an
-  ack, retried), with a pause after writes. On Windows the dongle sometimes ignored a command
-  sent straight after a write.
-- `win.rs`: finds the configuration collection (usage page `0xFF02`), overlapped I/O, and only
-  talks to the keyboard while no key is held. Otherwise the keyboard can drop a key release.
-- `audio.rs`: loopback capture (cpal), FFT bands with automatic level, the modes, and colour
-  groups that fit the 126-byte frame budget.
-- `anim.rs`: the animations as functions of time, in fixed bands so frames stay small and
-  smooth; the streaming thread with idle pause.
-- `app.rs`: saved settings, tray, autostart, single instance.
-- `macros.rs`, `keymap.rs`: macro store format, step parser, key layout and HID usages.
+- `protocol.rs`: the wireless packets (20-byte report `0x13`, 14-byte chunks, checksum), the
+  wired 520-byte feature reports, the 128-byte lighting and settings block, palettes, the
+  per-key table and keymap entries.
+- `device.rs`: reads (reassembled by packet index, with retries) and writes (each packet is
+  echoed back as an acknowledgement, with retries), with a pause after writes. Over the cable,
+  each write is read back to check it.
+- `win.rs`: finds the keyboard on each connection, does the Windows HID input and output, and
+  only talks to the keyboard while no key is held. Otherwise the keyboard can drop a key
+  release.
+- `audio.rs`: captures the PC's sound (WASAPI loopback), splits it into frequency bands with
+  automatic levels, and turns them into frames.
+- `anim.rs`: the animations as functions of time, and the streaming thread with idle pause.
+- `league.rs`, `gamelight.rs`, `match_watch.rs`: League's local match data, the game lighting,
+  and when to take over the keyboard and hand it back.
+- `app.rs`: saved settings and presets, tray, Start with Windows, single instance.
+- `macros.rs`, `keymap.rs`: the macro format, the step parser, the key layout and HID usages.
+
+The React side is in `src/`, with one file per page in `src/pages/`.
 
 ## Develop
+
+You need Node.js, Rust and the Visual Studio C++ build tools.
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
+Run the tests:
+
 ```bash
 cd src-tauri && cargo test
 ```
 
 The tests check packets against values captured from a real keyboard, round-trip the factory
-macro byte for byte, and parse a real backup.
+macro byte for byte, parse a real backup, and run sample League match data through the game lighting.
 
-The icon is `app-icon.svg`; regenerate every size with `npx tauri icon app-icon.svg`. The tray uses
-`tray-icon.svg` (just the letters, readable at 16-24 px), rendered to `src-tauri/icons/tray*.png`.
+Build the installers (an MSI and an NSIS setup, in `src-tauri/target/release/bundle/`):
 
-Installers: `npm run tauri build` puts an MSI and an NSIS setup in `src-tauri/target/release/bundle/`.
+```bash
+npm run tauri build
+```
+
+The app icon is `app-icon.svg`. Regenerate every size with `npx tauri icon app-icon.svg`. The
+tray uses `tray-icon.svg`, a simpler version that stays readable at 16-24 px, rendered to
+`src-tauri/icons/tray.png` and `tray@2x.png`.
 
 ## Credits
 
@@ -101,12 +145,11 @@ MIT, see [LICENSE](LICENSE). The parts from aula-f75-hub stay under its MIT lice
 
 ## Disclaimer
 
-Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games
-or anyone officially involved in producing or managing Riot Games properties. Riot Games, and
-all associated properties are trademarks or registered trademarks of Riot Games, Inc.
-
-
 This is an unofficial, independent project. It isn't affiliated with, endorsed by or
 supported by AULA. AULA and F75 are trademarks of their owner and are used here only to say
 which keyboard this app works with. Use it at your own risk: it writes to the keyboard's
 settings, so make a backup first (Device → Backup).
+
+Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games
+or anyone officially involved in producing or managing Riot Games properties. Riot Games, and
+all associated properties are trademarks or registered trademarks of Riot Games, Inc.
