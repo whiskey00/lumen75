@@ -25,6 +25,9 @@ const KINDS: { id: AnimKind; label: string; help: string; soon?: boolean }[] = [
   { id: "sparkle", label: "Sparkle", help: "Keys twinkle in your colours over a dim glow" },
   { id: "gradient", label: "Gradient", help: "Your colours spread across the board, still" },
   { id: "fire", label: "Fire", help: "Flames rise from one edge, in your colours" },
+  { id: "aurora", label: "Aurora", help: "Slow curtains of light drift across the board" },
+  { id: "ripple", label: "Ripple", help: "Drops land on keys and send rings outwards" },
+  { id: "comet", label: "Comet", help: "A comet with a fading tail races around the edge" },
   { id: "image", label: "Image", help: "Plays a GIF or picture on the keys" },
 ];
 
@@ -50,6 +53,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
   const [frame, setFrame] = useState<AnimFrame | null>(null);
   const [busy, setBusy] = useState(false);
   const [mine, setMine] = useState<Presets["animations"]>([]);
+  const [ready, setReady] = useState<Presets["animations_ready"]>([]);
   const [importing, setImporting] = useState(false);
   const [info, setInfo] = useState<ImageInfo | null>(null);
   // every kind drawn with your settings, for the cards and (while off) the big keyboard
@@ -75,7 +79,13 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
 
   useEffect(() => {
     api.animGet().then(setState);
-    api.presetsGet().then((p) => setMine(p.animations)).catch(() => {});
+    api
+      .presetsGet()
+      .then((p) => {
+        setMine(p.animations);
+        setReady(p.animations_ready);
+      })
+      .catch(() => {});
     const offs = [
       listen<AnimFrame>("anim-frame", (e) => setFrame(e.payload)),
       listen<AnimState>("anim-state", (e) => {
@@ -133,11 +143,11 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
   const preview = previews[KINDS.findIndex((k) => k.id === s.kind)] ?? [];
   const colours = new Map<number, Rgb>(state.running ? (frame?.keys ?? []) : preview);
   const isImage = s.kind === "image";
-  const usesDirection = s.kind === "stream" || s.kind === "wave" || s.kind === "gradient" || s.kind === "fire";
+  const usesDirection = ["stream", "wave", "gradient", "fire", "aurora"].includes(s.kind);
 
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         {KINDS.map((k, i) => (
           <button
             key={k.id}
@@ -255,6 +265,19 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
                 <ColourPresets onPick={(colors) => set({ colors })} />
               </>
             )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground text-sm">Ready-made:</span>
+              {ready.map((p) => (
+                <Button key={p.name} size="sm" variant="outline" className="gap-2" onClick={() => set({ ...p.settings, image: s.image, fit: s.fit })}>
+                  <span className="flex">
+                    {p.settings.colors.slice(0, 3).map((c, i) => (
+                      <span key={i} className="-ml-1 size-3 rounded-full border border-black/40 first:ml-0" style={{ background: toHex(c) }} />
+                    ))}
+                  </span>
+                  {p.name}
+                </Button>
+              ))}
+            </div>
             <PresetBar
               title="My presets"
               saves="this animation: its type, colours or picture, speed, brightness and direction"

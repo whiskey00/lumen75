@@ -32,6 +32,12 @@ pub enum Kind {
     /// Flames rising from one edge of the board, in your colours: the first colour licks
     /// at the tips, the last burns at the base, and the hottest core glows almost white.
     Fire,
+    /// Drops land on random keys and send rings outwards, each drop in the next colour.
+    Ripple,
+    /// Slow curtains of light drifting across the board, like the northern lights.
+    Aurora,
+    /// A bright comet with a fading tail races around the edge of the board.
+    Comet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +78,29 @@ impl Default for Settings {
             fit: crate::imagelight::Fit::Fill,
         }
     }
+}
+
+/// Ready-made animations to start from, offered next to your own presets.
+pub fn ready_made() -> Vec<(&'static str, Settings)> {
+    let a = |kind, colors: &[Rgb], speed, direction| Settings {
+        kind,
+        colors: colors.to_vec(),
+        speed,
+        direction,
+        ..Settings::default()
+    };
+    use Direction::*;
+    vec![
+        ("Inferno", a(Kind::Fire, &[[180, 0, 0], [255, 70, 0], [255, 170, 0]], 1.2, Up)),
+        ("Neon Fire", a(Kind::Fire, &[[255, 0, 180], [255, 0, 60], [255, 120, 0]], 1.0, Up)),
+        ("Northern Lights", a(Kind::Aurora, &[[0, 255, 120], [0, 200, 200], [120, 60, 255]], 1.0, Right)),
+        ("Rainfall", a(Kind::Ripple, &[[0, 160, 255], [0, 255, 220], [120, 120, 255]], 1.0, Right)),
+        ("Synthwave Comet", a(Kind::Comet, &[[255, 0, 200], [140, 0, 255], [0, 230, 255]], 1.2, Right)),
+        ("Digital Rain", a(Kind::Stream, &[[0, 255, 60], [0, 90, 20], [0, 30, 8]], 0.8, Down)),
+        ("Ocean Wave", a(Kind::Wave, &[[0, 255, 213], [0, 128, 255], [32, 0, 255]], 1.0, Right)),
+        ("Candy Breath", a(Kind::Breathing, &[[255, 120, 200], [150, 200, 255], [255, 230, 120]], 1.0, Right)),
+        ("Starry Night", Settings { brightness: 0.8, ..a(Kind::Sparkle, &[[255, 255, 255], [150, 180, 255], [255, 220, 150]], 1.0, Right) }),
+    ]
 }
 
 /// Bands along the direction: each one is a colour group, and a frame fits about 11.
@@ -172,6 +201,27 @@ fn fire_color(colors: &[Rgb], h: f32) -> Rgb {
     mix(stops[i], stops[i + 1], x - i as f32)
 }
 
+/// Ripple: brightness levels a ring is drawn with (one group per colour and level).
+const RIPPLE_LEVELS: f32 = 4.0;
+
+/// The keys around the edge of the board, in order around it (clockwise from the top left).
+fn rim(leds: &[Led]) -> Vec<&Led> {
+    let mut edge: Vec<&Led> = leds
+        .iter()
+        .filter(|l| {
+            let row: Vec<f32> = leds.iter().filter(|o| o.row == l.row).map(|o| o.x).collect();
+            let (lo, hi) = row.iter().fold((f32::MAX, f32::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+            l.row == 0 || l.row == 5 || l.x == lo || l.x == hi
+        })
+        .collect();
+    // the board is about 2.6 times as wide as it's tall: squash x so the angle walks the rim evenly
+    edge.sort_by(|a, b| {
+        let angle = |l: &Led| ((l.y - 0.5) * 2.6).atan2(l.x - 0.5);
+        angle(a).total_cmp(&angle(b))
+    });
+    edge
+}
+
 /// The frame at time `t` (seconds) as colour groups.
 pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
     let colors: Vec<Rgb> = if s.colors.is_empty() { vec![[255, 255, 255]] } else { s.colors.clone() };
@@ -209,6 +259,76 @@ pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
             bands.insert(0, (c, leds.iter().map(|l| l.index).collect()));
         }
         Kind::Image => {} // drawn by render_image, from the decoded picture
+        Kind::Ripple => {
+            // a drop every 0.7 s, at a key picked by its number, each ring living 1.6 s
+            let (every, life) = (0.7, 1.6);
+            let newest = (t / every).floor() as i64;
+            for l in leds {
+                let mut best = (0.0f32, 0usize);
+                for n in (newest - (life / every).ceil() as i64)..=newest {
+                    if n < 0 {
+                        continue;
+                    }
+                    let age = t - n as f32 * every;
+                    if !(0.0..life).contains(&age) {
+                        continue;
+                    }
+                    let (cx, cy) = (seed(n as u8, n as u32 + 11), seed(n as u8, n as u32 + 29));
+                    let d = ((l.x - cx).powi(2) + ((l.y - cy) * 0.38).powi(2)).sqrt();
+                    let ring = (1.0 - (d - age * 0.55).abs() / 0.1).max(0.0) * (1.0 - age / life).powf(0.7);
+                    if ring > best.0 {
+                        best = (ring, n as usize % colors.len());
+                    }
+                }
+                let level = (best.0 * RIPPLE_LEVELS).round();
+                if level > 0.0 {
+                    let c = scale(colors[best.1], level / RIPPLE_LEVELS * bright);
+                    bands.entry(1000 + best.1 * 10 + level as usize).or_insert((c, Vec::new())).1.push(l.index);
+                }
+            }
+        }
+        Kind::Aurora => {
+            // columns of light: each band drifts through your colours and brightens and fades
+            for l in leds {
+                let b = band_of(l, s.direction);
+                let u = band_color(b);
+                let hue = fbm(u * 1.6, t * 0.12);
+                let glow = (0.1 + 1.2 * fbm(u * 3.0 + 7.0, t * 0.35)).clamp(0.15, 1.0);
+                let pos = ((hue - 0.3) * 2.2).clamp(0.0, 1.0);
+                let c = if colors.len() == 1 {
+                    colors[0]
+                } else {
+                    let x = pos * (colors.len() - 1) as f32;
+                    let i = (x as usize).min(colors.len() - 2);
+                    mix(colors[i], colors[i + 1], x - i as f32)
+                };
+                bands.entry(b).or_insert((scale(c, glow * bright), Vec::new())).1.push(l.index);
+            }
+        }
+        Kind::Comet => {
+            let rim = rim(leds);
+            let n = rim.len().max(1) as f32;
+            let lap = t * 0.45; // laps a second at speed 1
+            let head = lap.fract() * n;
+            // a new colour each lap
+            let c = colors[(lap.floor() as usize) % colors.len()];
+            let dim = scale(colors[0], 0.06 * bright);
+            const TAIL: f32 = 7.0;
+            for (i, l) in rim.iter().enumerate() {
+                let behind = (head - i as f32).rem_euclid(n);
+                if behind < TAIL {
+                    let level = (TAIL - behind.floor()) as usize; // 7 at the head .. 1 at the end
+                    let v = (level as f32 / TAIL).powf(1.8);
+                    let col = if level as f32 == TAIL { mix(c, [255, 255, 255], 0.45) } else { c };
+                    bands.entry(2000 + level).or_insert((scale(col, v * bright), Vec::new())).1.push(l.index);
+                }
+            }
+            // the inside glows faintly, so the comet has something to fly around
+            let on_rim: std::collections::HashSet<u8> = rim.iter().map(|l| l.index).collect();
+            for l in leds.iter().filter(|l| !on_rim.contains(&l.index)) {
+                bands.entry(0).or_insert((dim, Vec::new())).1.push(l.index);
+            }
+        }
         Kind::Fire => {
             let t = t * 0.8;
             for l in leds {
@@ -455,8 +575,8 @@ pub mod run {
 mod tests {
     use super::*;
 
-    fn kinds() -> [Kind; 6] {
-        [Kind::Stream, Kind::Breathing, Kind::Wave, Kind::Sparkle, Kind::Gradient, Kind::Fire]
+    fn kinds() -> [Kind; 9] {
+        [Kind::Stream, Kind::Breathing, Kind::Wave, Kind::Sparkle, Kind::Gradient, Kind::Fire, Kind::Ripple, Kind::Aurora, Kind::Comet]
     }
 
     #[test]
@@ -510,6 +630,28 @@ mod tests {
                 .sum()
         };
         assert!(total(5) > total(0));
+    }
+
+    #[test]
+    fn comet_runs_around_the_rim() {
+        let leds = leds();
+        let rim = rim(&leds);
+        assert_eq!(rim.len(), 30, "the F-row, the bottom row and both ends of the 4 rows between");
+        let esc = crate::keymap::key_by_name("esc").unwrap().index;
+        let space = crate::keymap::key_by_name("space").unwrap().index;
+        assert!(rim.iter().any(|l| l.index == esc) && rim.iter().any(|l| l.index == space));
+        let s = Settings { kind: Kind::Comet, ..Settings::default() };
+        let brightest = |t: f32| render(&leds, &s, t).into_iter().max_by_key(|(c, _)| c.iter().map(|&v| v as u32).sum::<u32>()).unwrap().1;
+        assert_ne!(brightest(0.0), brightest(0.5)); // the head moved
+    }
+
+    #[test]
+    fn ripples_come_and_go() {
+        let leds = leds();
+        let s = Settings { kind: Kind::Ripple, ..Settings::default() };
+        let lit = |t: f32| render(&leds, &s, t).iter().map(|g| g.1.len()).sum::<usize>();
+        assert!((0..40).map(|i| lit(i as f32 * 0.1)).max().unwrap() > 0);
+        assert_ne!(render(&leds, &s, 1.0), render(&leds, &s, 1.3));
     }
 
     #[test]

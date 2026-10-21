@@ -157,7 +157,7 @@ export interface AudioFrame {
   device: string;
 }
 
-export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "fire" | "image";
+export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "fire" | "ripple" | "aurora" | "comet" | "image";
 /** How a picture is laid over the board. */
 export type ImageFit = "fill" | "fit" | "stretch";
 export type AnimDirection = "right" | "left" | "up" | "down";
@@ -278,6 +278,8 @@ export interface Presets {
   perkey: { name: string; colors: Rgb[] }[];
   audio: { name: string; settings: AudioSettings }[];
   league: { name: string; setup: LeagueSetup }[];
+  /** Ready-made animations that come with the app. */
+  animations_ready: { name: string; settings: AnimSettings }[];
   /** Ready-made League setups that come with the app. */
   league_ready: { name: string; setup: LeagueSetup }[];
 }

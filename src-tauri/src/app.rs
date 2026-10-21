@@ -318,6 +318,9 @@ fn playing_now(app: &AppHandle) -> Option<Playing> {
             anim::Kind::Sparkle => "Sparkle",
             anim::Kind::Gradient => "Gradient",
             anim::Kind::Fire => "Fire",
+            anim::Kind::Ripple => "Ripple",
+            anim::Kind::Aurora => "Aurora",
+            anim::Kind::Comet => "Comet",
             anim::Kind::Image => "Image",
         };
         return Some(Playing { kind: "animation", label: format!("{name} animation") });
@@ -368,6 +371,8 @@ pub struct Presets {
     league: Vec<LeaguePreset>,
     /// The ready-made League setups (not saved, not deletable).
     league_ready: Vec<LeaguePreset>,
+    /// The ready-made animations (not saved, not deletable).
+    animations_ready: Vec<AnimPreset>,
 }
 
 fn presets(c: &AppConfig) -> Presets {
@@ -376,6 +381,7 @@ fn presets(c: &AppConfig) -> Presets {
         perkey: c.perkey_presets.clone(),
         audio: c.audio_presets.clone(),
         league: c.league_presets.clone(),
+        animations_ready: anim::ready_made().into_iter().map(|(name, settings)| AnimPreset { name: name.into(), settings }).collect(),
         league_ready: gamelight::ready_made()
             .into_iter()
             .map(|(name, setup)| LeaguePreset { name: name.into(), setup })
