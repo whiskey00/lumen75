@@ -22,8 +22,7 @@ const KINDS: { id: AnimKind; label: string; help: string; soon?: boolean }[] = [
   { id: "wave", label: "Wave", help: "A bright crest sweeps over your colours" },
   { id: "sparkle", label: "Sparkle", help: "Keys twinkle in your colours over a dim glow" },
   { id: "gradient", label: "Gradient", help: "Your colours spread across the board, still" },
-  // works, but doesn't look good enough yet over 2.4G (about 11 colours a frame)
-  { id: "image", label: "Image", help: "Plays a GIF or picture on the keys", soon: true },
+  { id: "image", label: "Image", help: "Plays a GIF or picture on the keys" },
 ];
 
 const FITS: { id: ImageFit; label: string; help: string }[] = [
