@@ -264,6 +264,18 @@ pub async fn anim_image_import(app: AppHandle, path: String) -> Result<ImageInfo
     .map_err(|e| e.to_string())?
 }
 
+/// Preview frames at `t` seconds, one for each of `kinds` with these settings: the page's
+/// keyboard before you turn the animation on, and the picker's cards.
+#[tauri::command]
+pub async fn anim_preview(settings: anim::Settings, kinds: Vec<anim::Kind>, t: f32) -> Vec<Vec<(u8, crate::protocol::Rgb)>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let leds = crate::audio::leds();
+        kinds.into_iter().map(|kind| anim::preview(&leds, &anim::Settings { kind, ..settings.clone() }, t)).collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
 /// New settings: saved, and applied at once if the animation runs.
 #[tauri::command]
 pub fn anim_update(app: AppHandle, settings: anim::Settings) {

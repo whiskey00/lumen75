@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Keyboard } from "@/components/keyboard";
+import { MiniKeyboard } from "@/components/mini-keyboard";
 import { ColourInput } from "@/components/colour-input";
 import { PresetBar } from "@/components/preset-bar";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ function mainColours(colors: Rgb[]): string[] {
   return top.length ? top.slice(0, 5) : ["#000000"];
 }
 import type { Run } from "@/lib/run";
+import { friendly } from "@/lib/errors";
 
 const SWATCHES = ["#ff0000", "#ff6000", "#ffd000", "#00ff40", "#00e5ff", "#0040ff", "#8a00ff", "#ff00b0", "#ffffff"];
 
@@ -40,8 +42,25 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
     api.presetsGet().then((p) => setMine(p.perkey)).catch(() => {});
   }, []);
 
-  const dirty = useMemo(() => draft.some((c, i) => c.join() !== board.custom[i]?.join()), [draft, board.custom]);
+  const changed = useMemo(() => draft.filter((c, i) => c.join() !== board.custom[i]?.join()).length, [draft, board.custom]);
+  const dirty = changed > 0;
   const keys = catalog.keys;
+
+  // Ctrl+A selects every key, Esc clears the selection (not while typing in a field)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelected(new Set(keys.map((k) => k.index)));
+      } else if (e.key === "Escape") {
+        setSelected(new Set());
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [keys]);
   const byName = (n: string) => keys.find((k) => k.name === n)?.index;
 
   const paint = (rgb: Rgb, indices: Iterable<number>) =>
@@ -58,8 +77,8 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
           <div className="grid gap-1.5">
             <CardTitle>Per-key colours</CardTitle>
             <CardDescription>
-              Select keys (hold and drag over several, Ctrl/Shift to add more), paint them, then apply. Applying switches the
-              keyboard to the per-key effect.
+              Select keys (hold and drag over several, Ctrl/Shift to add more, Ctrl+A for all, Esc to clear), paint them,
+              then apply. Applying switches the keyboard to the per-key effect.
             </CardDescription>
           </div>
           {dirty && <Badge variant="secondary">Not applied yet</Badge>}
@@ -130,7 +149,11 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
           <PresetBar
             title="My layouts"
             saves="the colours of every key as they are in the editor now (also changes you haven't applied)"
-            items={mine.map((p) => ({ name: p.name, swatch: mainColours(p.colors) }))}
+            items={mine.map((p) => ({
+              name: p.name,
+              swatch: mainColours(p.colors),
+              thumb: <MiniKeyboard keys={keys} colours={p.colors} className="h-7 w-auto rounded-sm bg-neutral-950" />,
+            }))}
             onLoad={(name) => {
               const p = mine.find((x) => x.name === name);
               if (p) {
@@ -144,7 +167,7 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
                 toast.success(`Saved “${name.trim()}”`);
                 return true;
               } catch (e) {
-                toast.error("Can't save the layout", { description: String(e) });
+                toast.error("Can't save the layout", { description: friendly(e) });
                 return false;
               }
             }}
@@ -155,14 +178,32 @@ export function PerKeyPage({ board, catalog, busy, run }: { board: Board; catalo
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" disabled={!dirty || busy} onClick={() => setDraft(board.custom)}>
-          <Undo2 /> Revert
-        </Button>
-        <Button disabled={busy || (!dirty && board.active_effect === 32)} onClick={() => run("Per-key colours", () => api.setCustom(draft))}>
-          <Upload /> Apply to keyboard
-        </Button>
-      </div>
+      {dirty ? (
+        // stays in view at the bottom while there's something to apply
+        <div className="bg-background/95 border-primary/40 sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur">
+          <span className="bg-primary size-2 rounded-full" />
+          <span className="text-sm">
+            {changed} {changed === 1 ? "key" : "keys"} changed, not on the keyboard yet
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button variant="ghost" disabled={busy} onClick={() => setDraft(board.custom)}>
+              <Undo2 /> Discard
+            </Button>
+            <Button disabled={busy} onClick={() => run("Per-key colours", () => api.setCustom(draft))}>
+              <Upload /> Apply to keyboard
+            </Button>
+          </div>
+        </div>
+      ) : (
+        board.active_effect !== 32 && (
+          <div className="flex items-center justify-end gap-3">
+            <span className="text-muted-foreground text-sm">The keyboard is on another effect.</span>
+            <Button disabled={busy} onClick={() => run("Per-key colours", () => api.setCustom(draft))}>
+              <Upload /> Show these colours
+            </Button>
+          </div>
+        )
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { AudioLines, Info, VolumeX } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -15,6 +16,7 @@ import { PresetBar } from "@/components/preset-bar";
 import { ColourList, ColourPresets } from "@/components/colour-list";
 import { cn } from "@/lib/utils";
 import { api, AudioFrame, AudioMode, AudioSettings, Catalog, Presets, Rgb, toHex } from "@/lib/api";
+import { friendly } from "@/lib/errors";
 
 const MODES: { id: AudioMode; label: string; help: string }[] = [
   { id: "spectrum", label: "Spectrum", help: "Bars rise from the bottom, bass on the left" },
@@ -59,6 +61,8 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
   const [devices, setDevices] = useState<{ devices: string[]; default: string | null }>({ devices: [], default: null });
   const [mine, setMine] = useState<Presets["audio"]>([]);
   const first = useRef(true);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     api.audioRunning().then(setRunning);
@@ -66,7 +70,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
     api.presetsGet().then((p) => setMine(p.audio)).catch(() => {});
     const offs = [
       listen<AudioFrame>("audio-frame", (e) => setFrame(e.payload)),
-      listen<string>("audio-error", (e) => toast.error("Audio lighting", { description: e.payload })),
+      listen<string>("audio-error", (e) => toast.error("Audio lighting", { description: friendly(e.payload) })),
       listen("audio-stopped", () => {
         setRunning(false);
         setFrame(null);
@@ -74,6 +78,13 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
     ];
     return () => offs.forEach((p) => p.then((off) => off()));
   }, []);
+
+  // while it's off the page still listens and draws (nothing reaches the keyboard)
+  useEffect(() => {
+    if (running) return;
+    api.audioPreview(true, settingsRef.current).catch(() => {});
+    return () => void api.audioPreview(false, settingsRef.current).catch(() => {});
+  }, [running]);
 
   // settings changes reach the running stream at once, and are remembered
   useEffect(() => {
@@ -87,6 +98,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
       return;
     }
     if (running) api.audioUpdate(settings).catch(() => {});
+    else api.audioPreview(true, settings).catch(() => {});
   }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = async (on: boolean) => {
@@ -101,7 +113,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
         setFrame(null);
       }
     } catch (e) {
-      toast.error(on ? "Can't start audio lighting" : "Can't stop audio lighting", { description: String(e) });
+      toast.error(on ? "Can't start audio lighting" : "Can't stop audio lighting", { description: friendly(e) });
     } finally {
       setStarting(false);
     }
@@ -142,6 +154,11 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
             <div className="grid gap-1.5">
               <CardTitle className="flex items-center gap-2">
                 <AudioLines className="size-5" /> The lights follow the computer's sound
+                {!running && (
+                  <Badge variant="outline" title="Not sent to the keyboard: turn it on to see it there">
+                    Preview
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>Whatever is playing, no microphone needed. Runs while this app is open.</CardDescription>
             </div>
@@ -266,7 +283,7 @@ export function AudioPage({ catalog }: { catalog: Catalog }) {
                   toast.success(`Saved “${name.trim()}”`);
                   return true;
                 } catch (e) {
-                  toast.error("Can't save the preset", { description: String(e) });
+                  toast.error("Can't save the preset", { description: friendly(e) });
                   return false;
                 }
               }}

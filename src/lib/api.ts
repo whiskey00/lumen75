@@ -343,6 +343,9 @@ export const api = {
   leagueSet: (change: { on?: boolean; setup?: LeagueSetup }) => invoke<LeagueState>("league_set", change),
   leaguePresetSave: (name: string, setup: LeagueSetup) => invoke<Presets>("league_preset_save", { name, setup }),
   animGet: () => invoke<AnimState>("anim_get"),
+  animPreview: (settings: AnimSettings, kinds: AnimKind[], t: number) =>
+    invoke<[number, Rgb][][]>("anim_preview", { settings, kinds, t }),
+  audioPreview: (on: boolean, settings: AudioSettings) => invoke<void>("audio_preview", { on, settings }),
   animImageImport: (path: string) => invoke<ImageInfo>("anim_image_import", { path }),
   animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
   animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),

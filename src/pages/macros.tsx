@@ -143,7 +143,7 @@ function MacroEditor(props: { initialName: string; board: Board; catalog: Catalo
                 <SelectTrigger className="w-44">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-72">
+                <SelectContent>
                   <SelectItem value={NONE}>No key</SelectItem>
                   {assignable.map((k) => (
                     <SelectItem key={`1:${k.index}`} value={`1:${k.index}`}>

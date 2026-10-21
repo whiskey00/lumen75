@@ -351,6 +351,8 @@ pub mod run {
         kb: Arc<Mutex<Option<Keyboard>>>,
         open: fn() -> crate::device::Result<Keyboard>,
         settings: Settings,
+        // false: a preview, frames go to the page only, never to the keyboard
+        send: bool,
         emit: impl Fn(Event) + Send + 'static,
     ) -> Result<Handle, String> {
         let stop = Arc::new(AtomicBool::new(false));
@@ -412,7 +414,7 @@ pub mod run {
                 };
                 let levels = analyzer.update(&buf, &s).to_vec();
                 let groups = render(&leds, &levels, &s, started.elapsed().as_secs_f32());
-                let sent = crate::device::send_frame(&kb, open, &groups);
+                let sent = if send { crate::device::send_frame(&kb, open, &groups) } else { Ok(Vec::new()) };
                 match sent {
                     Ok(_) => failures = 0,
                     Err(e) => {
@@ -430,7 +432,9 @@ pub mod run {
                 }
             }
             drop(stream);
-            emit(Event::Stopped);
+            if send {
+                emit(Event::Stopped);
+            }
         });
         match ready_rx.recv_timeout(Duration::from_secs(5)) {
             Ok(Ok(())) => Ok(Handle { stop, settings: shared, thread: Some(thread) }),

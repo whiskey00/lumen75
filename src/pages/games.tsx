@@ -28,6 +28,7 @@ import {
   Rgb,
   toHex,
 } from "@/lib/api";
+import { friendly } from "@/lib/errors";
 
 const VALUES: { id: LeagueValue; label: string }[] = [
   { id: "health", label: "Health" },
@@ -148,7 +149,7 @@ function LeagueLighting({ catalog, onBack }: { catalog: Catalog; onBack: () => v
         setState((s) => (s ? { ...e.payload, setup: s.setup } : e.payload));
         if (!e.payload.live) setFrame(null);
       }),
-      listen<string>("league-error", (e) => toast.error("League lighting", { description: e.payload })),
+      listen<string>("league-error", (e) => toast.error("League lighting", { description: friendly(e.payload) })),
     ];
     return () => offs.forEach((p) => p.then((off) => off()));
   }, []);
@@ -170,7 +171,7 @@ function LeagueLighting({ catalog, onBack }: { catalog: Catalog; onBack: () => v
     try {
       setState({ ...(await api.leagueSet({ on })), setup: s });
     } catch (e) {
-      toast.error("Can't change League lighting", { description: String(e) });
+      toast.error("Can't change League lighting", { description: friendly(e) });
     } finally {
       setBusy(false);
     }
@@ -489,7 +490,7 @@ function LeagueLighting({ catalog, onBack }: { catalog: Catalog; onBack: () => v
                 toast.success(`Saved “${name.trim()}”`);
                 return true;
               } catch (e) {
-                toast.error("Can't save the setup", { description: String(e) });
+                toast.error("Can't save the setup", { description: friendly(e) });
                 return false;
               }
             }}

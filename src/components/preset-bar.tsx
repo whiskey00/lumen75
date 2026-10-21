@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Bookmark, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ export interface PresetItem {
   name: string;
   /** A few colours to show on the chip. */
   swatch: string[];
+  /** A picture to show instead of the colours (a mini keyboard, say). */
+  thumb?: ReactNode;
 }
 
 interface Props {
@@ -47,12 +49,14 @@ export function PresetBar({ title, items, saves, onLoad, onSave, onDelete }: Pro
       {items.length === 0 && <span className="text-muted-foreground text-sm italic">none yet</span>}
       {items.map((p) => (
         <div key={p.name} className="group relative">
-          <Button size="sm" variant="secondary" className="gap-2 pr-3" onClick={() => onLoad(p.name)}>
-            <span className="flex">
-              {p.swatch.slice(0, 5).map((c, i) => (
-                <span key={i} className="-ml-1 size-3 rounded-full border border-black/40 first:ml-0" style={{ background: c }} />
-              ))}
-            </span>
+          <Button size="sm" variant="secondary" className={p.thumb ? "h-auto gap-2 py-1.5 pr-3" : "gap-2 pr-3"} onClick={() => onLoad(p.name)}>
+            {p.thumb ?? (
+              <span className="flex">
+                {p.swatch.slice(0, 5).map((c, i) => (
+                  <span key={i} className="-ml-1 size-3 rounded-full border border-black/40 first:ml-0" style={{ background: c }} />
+                ))}
+              </span>
+            )}
             {p.name}
           </Button>
           <button

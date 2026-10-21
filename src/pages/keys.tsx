@@ -219,7 +219,7 @@ function KeyEditor(props: {
                 <SelectTrigger className="w-60">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-72">
+                <SelectContent>
                   {catalog.hid.map(([n, l, u]) => (
                     <SelectItem key={n} value={String(u)}>
                       {l}

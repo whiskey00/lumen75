@@ -11,10 +11,12 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
+import { MiniKeyboard } from "@/components/mini-keyboard";
 import { PresetBar } from "@/components/preset-bar";
 import { ColourList, ColourPresets, MAX_COLOURS } from "@/components/colour-list";
 import { cn } from "@/lib/utils";
 import { api, AnimDirection, AnimFrame, AnimKind, AnimSettings, AnimState, Catalog, ImageFit, ImageInfo, Presets, Rgb, toHex } from "@/lib/api";
+import { friendly } from "@/lib/errors";
 
 const KINDS: { id: AnimKind; label: string; help: string; soon?: boolean }[] = [
   { id: "stream", label: "Stream", help: "Your colours flow across the board" },
@@ -50,7 +52,26 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
   const [mine, setMine] = useState<Presets["animations"]>([]);
   const [importing, setImporting] = useState(false);
   const [info, setInfo] = useState<ImageInfo | null>(null);
+  // every kind drawn with your settings, for the cards and (while off) the big keyboard
+  const [previews, setPreviews] = useState<[number, Rgb][][]>([]);
+  const latest = useRef<AnimSettings | null>(null);
   const pending = useRef<number | null>(null);
+
+  useEffect(() => {
+    const t0 = performance.now();
+    let busy = false;
+    const timer = window.setInterval(() => {
+      const settings = latest.current;
+      if (!settings || busy || document.hidden) return;
+      busy = true;
+      api
+        .animPreview(settings, KINDS.map((k) => k.id), (performance.now() - t0) / 1000)
+        .then(setPreviews)
+        .catch(() => {})
+        .finally(() => (busy = false));
+    }, 80);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     api.animGet().then(setState);
@@ -61,13 +82,14 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
         setState(e.payload);
         if (!e.payload.running) setFrame(null);
       }),
-      listen<string>("anim-error", (e) => toast.error("Animation", { description: e.payload })),
+      listen<string>("anim-error", (e) => toast.error("Animation", { description: friendly(e.payload) })),
     ];
     return () => offs.forEach((p) => p.then((off) => off()));
   }, []);
 
   if (!state) return null;
   const s = state.settings;
+  latest.current = s;
 
   /** Change settings: shown at once, saved and sent shortly after (sliders send many). */
   const set = (p: Partial<AnimSettings>) => {
@@ -83,7 +105,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
       setState(on ? await api.animStart(s) : await api.animStop());
       if (!on) setFrame(null);
     } catch (e) {
-      toast.error(on ? "Can't start the animation" : "Can't stop the animation", { description: String(e) });
+      toast.error(on ? "Can't start the animation" : "Can't stop the animation", { description: friendly(e) });
     } finally {
       setBusy(false);
     }
@@ -101,45 +123,45 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
       setInfo(i);
       set({ kind: "image", image: i.path });
     } catch (e) {
-      toast.error("Can't use that picture", { description: String(e) });
+      toast.error("Can't use that picture", { description: friendly(e) });
     } finally {
       setImporting(false);
     }
   };
 
-  const colours = new Map<number, Rgb>(frame?.keys ?? []);
+  // the keyboard's own frames while it runs, the preview while it's off
+  const preview = previews[KINDS.findIndex((k) => k.id === s.kind)] ?? [];
+  const colours = new Map<number, Rgb>(state.running ? (frame?.keys ?? []) : preview);
   const isImage = s.kind === "image";
   const usesDirection = s.kind === "stream" || s.kind === "wave" || s.kind === "gradient" || s.kind === "fire";
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <Card className="self-start">
-        <CardHeader>
-          <CardTitle>Animation</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-1">
-          {KINDS.map((k) => (
-            <Button
-              key={k.id}
-              variant={s.kind === k.id ? "secondary" : "ghost"}
-              className="h-auto flex-col items-start gap-0.5 py-2 text-left whitespace-normal"
-              disabled={k.soon}
-              // fire rises from the bottom unless you pick another edge
-              onClick={() => set(k.id === "fire" && s.kind !== "fire" ? { kind: k.id, direction: "up" } : { kind: k.id })}
-            >
-              <span className="flex items-center gap-2">
-                {k.label}
-                {k.soon && (
-                  <Badge variant="outline" className="text-[10px]">
-                    Under construction
-                  </Badge>
-                )}
-              </span>
-              <span className="text-muted-foreground text-xs font-normal">{k.help}</span>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="grid gap-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+        {KINDS.map((k, i) => (
+          <button
+            key={k.id}
+            type="button"
+            disabled={k.soon}
+            title={k.help}
+            onClick={() => set(k.id === "fire" && s.kind !== "fire" ? { kind: k.id, direction: "up" } : { kind: k.id })}
+            className={cn(
+              "bg-card hover:border-primary/50 grid gap-1.5 rounded-lg border p-2 text-left transition-colors disabled:opacity-50",
+              s.kind === k.id && "border-primary ring-primary/30 ring-2",
+            )}
+          >
+            <MiniKeyboard keys={catalog.keys} colours={new Map(previews[i] ?? [])} className="w-full" />
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              {k.label}
+              {k.soon && (
+                <Badge variant="outline" className="text-[10px]">
+                  Soon
+                </Badge>
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
 
       <div className="grid gap-4">
         <Card>
@@ -147,6 +169,11 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
             <div className="grid gap-1.5">
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="size-5" /> {isImage ? "Your picture, on the keys" : "Your colours, animated"}
+                {!state.running && (
+                  <Badge variant="outline" title="Not sent to the keyboard: turn it on to see it there">
+                    Preview
+                  </Badge>
+                )}
                 {frame?.paused && (
                   <Badge variant="outline" className="gap-1">
                     <Moon className="size-3" /> paused while idle
@@ -242,7 +269,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
                   toast.success(`Saved “${name.trim()}”`);
                   return true;
                 } catch (e) {
-                  toast.error("Can't save the preset", { description: String(e) });
+                  toast.error("Can't save the preset", { description: friendly(e) });
                   return false;
                 }
               }}

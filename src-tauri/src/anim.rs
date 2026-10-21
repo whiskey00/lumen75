@@ -303,6 +303,30 @@ pub fn frame(leds: &[Led], s: &Settings, t: f32) -> crate::protocol::Result<Vec<
     encode(&fit(render(leds, s, t)))
 }
 
+/// The decoded picture the preview last used, so previews don't decode it every frame.
+static PREVIEW_CLIP: std::sync::Mutex<Option<(String, crate::imagelight::Fit, Option<crate::imagelight::Clip>)>> =
+    std::sync::Mutex::new(None);
+
+/// Every key's colour at time `t`, drawn without the keyboard (the page's preview, and the
+/// picker's cards). Full colour, as over the cable.
+pub fn preview(leds: &[Led], s: &Settings, t: f32) -> Vec<(u8, Rgb)> {
+    let groups = if s.kind == Kind::Image {
+        let Some(path) = &s.image else { return Vec::new() };
+        let mut cache = PREVIEW_CLIP.lock().unwrap();
+        if cache.as_ref().is_none_or(|(p, f, _)| p != path || *f != s.fit) {
+            let clip = crate::imagelight::load(std::path::Path::new(path), s.fit).ok();
+            *cache = Some((path.clone(), s.fit, clip));
+        }
+        match cache.as_ref().and_then(|c| c.2.as_ref()) {
+            Some(clip) => render_image(clip, s, t),
+            None => Vec::new(),
+        }
+    } else {
+        render(leds, s, t)
+    };
+    groups.iter().flat_map(|(c, ks)| ks.iter().map(move |&k| (k, *c))).collect()
+}
+
 /// What the UI gets every frame: the key colours shown, or that it's paused for idleness.
 #[derive(Debug, Clone, Serialize)]
 pub struct FrameEvent {

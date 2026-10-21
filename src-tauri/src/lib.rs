@@ -157,6 +157,9 @@ pub(crate) struct AppState {
     pub(crate) league_status: Mutex<Option<String>>,
     #[cfg(windows)]
     pub(crate) discord: Mutex<Option<discord::run::Handle>>,
+    /// The Audio page's preview: listening and drawing, nothing sent to the keyboard.
+    #[cfg(windows)]
+    pub(crate) audio_preview: Mutex<Option<audio::run::Handle>>,
     #[cfg(windows)]
     pub(crate) discord_status: Mutex<String>,
     #[cfg(windows)]
@@ -679,8 +682,12 @@ pub(crate) fn start_audio(app: &tauri::AppHandle, settings: audio::Settings) -> 
     if state.anim.lock().map(|a| a.is_some()).unwrap_or(false) {
         app::stop_animation(app, true);
     }
+    // the real thing replaces the page's preview
+    if let Some(p) = state.audio_preview.lock().map_err(|_| "audio lock poisoned".to_string())?.take() {
+        p.stop();
+    }
     let app = app.clone();
-    let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, move |ev| {
+    let handle = audio::run::start(state.kb.clone(), open_keyboard, settings, true, move |ev| {
         let _ = match ev {
             audio::run::Event::Frame(f) => app.emit("audio-frame", f),
             audio::run::Event::Error(e) => app.emit("audio-error", e),
@@ -710,6 +717,40 @@ async fn audio_stop(state: tauri::State<'_, AppState>) -> std::result::Result<()
         tauri::async_runtime::spawn_blocking(move || h.stop()).await.map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Start or stop the Audio page's preview (only while the audio lighting itself is off):
+/// frames arrive as "audio-frame" like the real thing, but nothing reaches the keyboard.
+#[cfg(windows)]
+#[tauri::command]
+async fn audio_preview(app: tauri::AppHandle, on: bool, settings: audio::Settings) -> std::result::Result<(), String> {
+    use tauri::{Emitter, Manager};
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let mut slot = state.audio_preview.lock().map_err(|_| "audio lock poisoned".to_string())?;
+        if !on {
+            if let Some(p) = slot.take() {
+                p.stop();
+            }
+            return Ok(());
+        }
+        if state.audio.lock().map(|a| a.is_some()).unwrap_or(false) {
+            return Ok(()); // the real thing is on: its frames are the preview
+        }
+        if let Some(p) = slot.as_ref() {
+            *p.settings.lock().unwrap() = settings;
+            return Ok(());
+        }
+        let app2 = app.clone();
+        *slot = Some(audio::run::start(state.kb.clone(), open_keyboard, settings, false, move |ev| {
+            if let audio::run::Event::Frame(f) = ev {
+                let _ = app2.emit("audio-frame", f);
+            }
+        })?);
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Serialize)]
@@ -761,7 +802,8 @@ pub fn run() {
             app::app_settings_get, app::app_settings_set, app::presets_get, app::anim_preset_save,
             app::perkey_preset_save, app::audio_preset_save, app::preset_delete, app::league_get, app::league_set,
             app::league_preset_save, app::anim_image_import, app::discord_get, app::discord_set,
-            app::discord_reconnect, app::playing, app::stop_playing
+            app::discord_reconnect, app::playing, app::stop_playing,
+            app::anim_preview, audio_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

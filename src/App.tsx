@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { api, Board, Catalog, Connection, merge, Playing, ReadProgress, Snapshot, Status } from "@/lib/api";
@@ -18,6 +19,7 @@ import { AudioPage } from "@/pages/audio";
 import { AnimationsPage } from "@/pages/animations";
 import { GamesPage } from "@/pages/games";
 import { DiscordPage } from "@/pages/discord";
+import { friendly } from "@/lib/errors";
 
 type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "device";
 
@@ -39,6 +41,7 @@ const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; bo
 ];
 
 const CABLE = "USB cable";
+const WELCOMED = "lumen75.welcomed";
 
 /** The connection choices, with the device mode each one finds (none: any). */
 const CONNECTIONS: { id: Connection; label: string; mode?: string }[] = [
@@ -59,6 +62,22 @@ export default function App() {
   const [connection, setConnection] = useState<Connection>("auto");
   const [progress, setProgress] = useState<ReadProgress | null>(null);
   const [playing, setPlaying] = useState<Playing | null>(null);
+  // the first start shows a short welcome (connection, official app, backup)
+  const [welcome, setWelcome] = useState(() => {
+    try {
+      return localStorage.getItem(WELCOMED) === null;
+    } catch {
+      return false;
+    }
+  });
+  const closeWelcome = () => {
+    setWelcome(false);
+    try {
+      localStorage.setItem(WELCOMED, "1");
+    } catch {
+      /* storage unavailable: it shows again next time */
+    }
+  };
   const busyRef = useRef(false);
 
   const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => {}), []);
@@ -71,7 +90,7 @@ export default function App() {
       const s = await api.readAll();
       setBoard(merge(null, s));
     } catch (e) {
-      setError(String(e));
+      setError(friendly(e));
     } finally {
       setLoading(false);
       refreshStatus();
@@ -90,7 +109,7 @@ export default function App() {
     try {
       await api.appSettingsSet({ connection: c });
     } catch (e) {
-      setError(String(e));
+      setError(friendly(e));
       return;
     }
     reload();
@@ -113,7 +132,7 @@ export default function App() {
     try {
       setPlaying(await api.stopPlaying());
     } catch (e) {
-      toast.error("Can't stop it", { description: String(e) });
+      toast.error("Can't stop it", { description: friendly(e) });
     }
   };
 
@@ -137,7 +156,7 @@ export default function App() {
       toast.success(label, { id });
       return true;
     } catch (e) {
-      toast.error(label, { id, description: String(e), duration: 8000 });
+      toast.error(label, { id, description: friendly(e), duration: 8000 });
       return false;
     } finally {
       setBusyBoth(false);
@@ -241,6 +260,67 @@ export default function App() {
             </Button>
           </div>
         </header>
+
+        <Dialog open={welcome} onOpenChange={(o) => !o && closeWelcome()}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <img src="/logo.svg" alt="" className="size-9" /> Welcome to Lumen75
+              </DialogTitle>
+              <DialogDescription>An unofficial app for your AULA F75. Three things before you start:</DialogDescription>
+            </DialogHeader>
+            <ol className="grid gap-4 text-sm">
+              <li className="grid gap-2">
+                <span className="font-medium">1. How is the keyboard connected?</span>
+                <Select value={connection} onValueChange={(v) => chooseConnection(v as Connection)}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONNECTIONS.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground text-xs">
+                  Auto finds it on the cable, the 2.4G dongle or Bluetooth (pair “AULA-F75 5.0” in Windows settings first).
+                </span>
+              </li>
+              <li className="grid gap-1">
+                <span className="font-medium">2. Keep the official AULA app closed</span>
+                {status?.vendor_app_running ? (
+                  <span className="text-destructive">
+                    It's running now. Quit it, also from the tray: both apps talk to the keyboard over the same channel.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Both apps talk to the keyboard over the same channel, so use one at a time.</span>
+                )}
+              </li>
+              <li className="grid gap-1">
+                <span className="font-medium">3. Make a backup first</span>
+                <span className="text-muted-foreground">
+                  Device → Backup saves all the keyboard's settings to a folder, so you can always go back.
+                </span>
+              </li>
+            </ol>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                disabled={!board}
+                title={board ? undefined : "Once the keyboard has been read"}
+                onClick={() => {
+                  setPage("device");
+                  closeWelcome();
+                }}
+              >
+                Back up now
+              </Button>
+              <Button onClick={closeWelcome}>Get started</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto grid max-w-5xl gap-4">

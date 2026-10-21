@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { api, AppSettings, Board, Catalog } from "@/lib/api";
 import type { Run } from "@/lib/run";
+import { friendly } from "@/lib/errors";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const SIDE_HELP = ["Off", "Fills top to bottom", "Breathing", "Always on"];
@@ -44,7 +45,7 @@ export function DevicePage(props: {
       const saved = await api.backup(folder);
       toast.success(`Backup saved (${saved.length} tables)`, { description: folder });
     } catch (e) {
-      toast.error("Backup failed", { description: String(e) });
+      toast.error("Backup failed", { description: friendly(e) });
     } finally {
       setBusy(false);
     }
@@ -59,7 +60,7 @@ export function DevicePage(props: {
       toast.success(`Restored ${done.length} tables`, { description: folder });
       await reload();
     } catch (e) {
-      toast.error("Restore failed", { description: String(e) });
+      toast.error("Restore failed", { description: friendly(e) });
     } finally {
       setBusy(false);
     }
@@ -189,7 +190,7 @@ function AppCard() {
     try {
       setS(await api.appSettingsSet(c));
     } catch (e) {
-      toast.error("App setting", { description: String(e) });
+      toast.error("App setting", { description: friendly(e) });
     }
   };
   return (

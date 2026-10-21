@@ -25,6 +25,7 @@ import {
   Rgb,
   toHex,
 } from "@/lib/api";
+import { friendly } from "@/lib/errors";
 
 const INDICATORS: { id: DiscordIndicator; label: string; help: string }[] = [
   { id: "speaking", label: "You're talking", help: "While your mic picks you up" },
@@ -96,7 +97,7 @@ export function DiscordPage({ catalog }: { catalog: Catalog }) {
     try {
       setState(await f());
     } catch (e) {
-      toast.error(what, { description: String(e) });
+      toast.error(what, { description: friendly(e) });
     } finally {
       setBusy(false);
     }
