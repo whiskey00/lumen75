@@ -17,15 +17,17 @@ import { AnimationsPage } from "@/pages/animations";
 
 type Page = "lighting" | "perkey" | "animations" | "audio" | "keys" | "macros" | "device";
 
-const PAGES: { id: Page; label: string; icon: typeof Sun }[] = [
+const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun },
-  { id: "perkey", label: "Per-key", icon: Grid3x3 },
-  { id: "animations", label: "Animations", icon: Sparkles },
-  { id: "audio", label: "Audio", icon: AudioLines },
+  { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true },
+  { id: "animations", label: "Animations", icon: Sparkles, wireless: true },
+  { id: "audio", label: "Audio", icon: AudioLines, wireless: true },
   { id: "keys", label: "Keys", icon: KeyboardIcon },
-  { id: "macros", label: "Macros", icon: SquareFunction },
+  { id: "macros", label: "Macros", icon: SquareFunction, wireless: true },
   { id: "device", label: "Device", icon: Settings2 },
 ];
+
+const CABLE = "USB cable";
 
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -86,6 +88,9 @@ export default function App() {
   }, []);
 
   const supported = status?.devices.find((d) => d.supported);
+  const onCable = board?.mode === CABLE;
+  // a page the cable can't serve falls back to Lighting
+  const shown: Page = onCable && PAGES.find((p) => p.id === page)?.wireless ? "lighting" : page;
 
   return (
     <div className="bg-background text-foreground flex h-screen">
@@ -105,7 +110,8 @@ export default function App() {
               key={p.id}
               variant={page === p.id ? "secondary" : "ghost"}
               className="justify-start"
-              disabled={!board}
+              disabled={!board || (onCable && p.wireless)}
+              title={onCable && p.wireless ? "Not available over the USB cable yet" : undefined}
               onClick={() => setPage(p.id)}
             >
               <p.icon /> {p.label}
@@ -119,7 +125,7 @@ export default function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b px-6 py-3">
-          <h1 className="text-base font-medium">{PAGES.find((p) => p.id === page)?.label}</h1>
+          <h1 className="text-base font-medium">{PAGES.find((p) => p.id === shown)?.label}</h1>
           <div className="ml-auto flex items-center gap-2">
             {board ? (
               <Badge variant="secondary" className="gap-1.5">
@@ -155,8 +161,9 @@ export default function App() {
                   <CardTitle>{loading ? "Reading the keyboard…" : "Can't reach the keyboard"}</CardTitle>
                   <CardDescription>
                     {loading
-                      ? "This takes a few seconds over 2.4G, and longer over Bluetooth."
-                      : error ?? "Plug in the dongle and switch the keyboard to 2.4G, or to Bluetooth once it is paired in Windows settings. Then press a key to wake it."}
+                      ? "This takes a few seconds over 2.4G or the cable, and longer over Bluetooth."
+                      : error ??
+                        "Plug in the dongle and switch the keyboard to 2.4G, or to Bluetooth once it is paired in Windows settings. Then press a key to wake it. Or plug in the cable with the switch on wired."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -173,13 +180,13 @@ export default function App() {
 
             {board && catalog && (
               <>
-                {page === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
-                {page === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
-                {page === "animations" && <AnimationsPage catalog={catalog} />}
-                {page === "audio" && <AudioPage catalog={catalog} />}
-                {page === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
-                {page === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}
-                {page === "device" && (
+                {shown === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {shown === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {shown === "animations" && <AnimationsPage catalog={catalog} />}
+                {shown === "audio" && <AudioPage catalog={catalog} />}
+                {shown === "keys" && <KeysPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {shown === "macros" && <MacrosPage board={board} catalog={catalog} busy={busy} run={run} />}
+                {shown === "device" && (
                   <DevicePage board={board} catalog={catalog} busy={busy} run={run} setBusy={setBusyBoth} reload={reload} />
                 )}
               </>

@@ -76,7 +76,8 @@ export interface Board {
 export function merge(board: Board | null, s: Snapshot): Board | null {
   const defined = Object.fromEntries(Object.entries(s).filter(([, v]) => v !== null && v !== undefined));
   if (!board) {
-    return "effects" in defined && "keymap" in defined ? ({ battery: null, ...defined } as Board) : null;
+    // over the USB cable the per-key colours and macros aren't read (yet)
+    return "effects" in defined && "keymap" in defined ? ({ battery: null, custom: [] as Rgb[], macros: [] as MacroView[], ...defined } as Board) : null;
   }
   return { ...board, ...defined };
 }

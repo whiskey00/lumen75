@@ -394,6 +394,51 @@ pub fn key_entry(usage: u8, modifiers: u8) -> Entry {
     [0x00, modifiers, 0x00, usage]
 }
 
+// ------------------------------------------------------------ wired (USB cable)
+
+// Wired mode (258A:010C) talks through 520-byte feature reports (id 0x06) on its own
+// collection instead of 20-byte packets:
+//
+//   [0] 0x06  [1] command  [2] sub (keymap layer)  [3] 0  [4] 0x01  [5] 0
+//   [6..8] length, little-endian  [8..] data
+//
+// A read sends the request, then fetches the reply, which echoes the header. The read
+// commands below were found on hardware (2026-10-21) and return the same tables as the
+// wireless reads; the reply is a whole 512-byte page, of which the table is the start.
+// 0x88, 0x8b, 0x8e and 0x91 return firmware code: never needed.
+
+pub const WIRED_REPORT_ID: u8 = 0x06;
+pub const WIRED_REPORT_LEN: usize = 520;
+pub const WIRED_HEADER: usize = 8;
+const WIRED_PAGE: usize = 0x200;
+
+pub const WIRED_READ_MATRIX: u8 = 0x83; // = 0x41, sub = layer
+pub const WIRED_READ_LED: u8 = 0x84; // = 0x44
+pub const WIRED_READ_PALETTE: u8 = 0x8A; // = 0x49
+
+pub type WiredReport = [u8; WIRED_REPORT_LEN];
+
+pub fn wired_request(cmd: u8, sub: u8, len: usize) -> WiredReport {
+    let mut b = [0u8; WIRED_REPORT_LEN];
+    b[0] = WIRED_REPORT_ID;
+    b[1] = cmd;
+    b[2] = sub;
+    b[4] = 0x01;
+    b[6..8].copy_from_slice(&(len as u16).to_le_bytes());
+    b
+}
+
+/// The request for a table: the LED block is asked for by its own length, the others by page.
+pub fn wired_read_request(cmd: u8, sub: u8) -> WiredReport {
+    wired_request(cmd, sub, if cmd == WIRED_READ_LED { LED_LEN } else { WIRED_PAGE })
+}
+
+/// The first `len` data bytes of a reply to `cmd`/`sub`, or None if it answers something else.
+pub fn wired_reply(r: &[u8], cmd: u8, sub: u8, len: usize) -> Option<Vec<u8>> {
+    (r.len() >= WIRED_HEADER + len && r[0] == WIRED_REPORT_ID && r[1] == cmd && r[2] == sub)
+        .then(|| r[WIRED_HEADER..WIRED_HEADER + len].to_vec())
+}
+
 // ------------------------------------------------------------ factory tables
 
 /// Factory table dumps from aula-f75-hub's backup/ (a fresh keyboard).
@@ -510,5 +555,19 @@ mod tests {
         assert_eq!(factory::custom().len(), CUSTOM_LEN);
         assert_eq!(factory::macros().len(), MACRO_STORE_LEN);
         assert_eq!(matrix_entry(&factory::matrix(0), 0), [0, 0, 0, 0x29]); // Esc
+    }
+
+    // headers the keyboard echoed back over the cable (2026-10-21)
+    #[test]
+    fn wired_requests_and_replies() {
+        assert_eq!(wired_read_request(WIRED_READ_LED, 0)[..8], hex("06 84 00 00 01 00 80 00")[..]);
+        assert_eq!(wired_read_request(WIRED_READ_MATRIX, 1)[..8], hex("06 83 01 00 01 00 00 02")[..]);
+        assert_eq!(wired_read_request(WIRED_READ_PALETTE, 0).len(), WIRED_REPORT_LEN);
+
+        let mut r = wired_read_request(WIRED_READ_LED, 0);
+        r[WIRED_HEADER..WIRED_HEADER + LED_LEN].copy_from_slice(&factory::led());
+        assert_eq!(wired_reply(&r, WIRED_READ_LED, 0, LED_LEN), Some(factory::led()));
+        assert_eq!(wired_reply(&r, WIRED_READ_PALETTE, 0, LED_LEN), None);
+        assert_eq!(wired_reply(&r, WIRED_READ_LED, 1, LED_LEN), None);
     }
 }

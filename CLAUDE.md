@@ -19,7 +19,8 @@ work is done here.
   5. If the keyboard isn't found at all, print the HID paths (`find_devices()` in `win.rs`).
      `maybe_aula()` expects the Bluetooth paths to contain `vid&023554` (LE) or `vid&00023554`
      (classic).
-- Not supported: wired mode (258A:010C, different transport).
+- **Wired (258A:010C): reads only** (lighting, palettes, keymap), verified on hardware. Writes are
+  next, one at a time. See "Wired protocol" below.
 - Battery reading is experimental (first byte of the 0x4A reply).
 - No git remote yet: the owner will add a GitHub repo and push.
 
@@ -46,6 +47,17 @@ work is done here.
     in (stall limit 25, at most 60 attempts), 18 of 18 full reads worked, 4-40 s each. Reading
     everything takes about 2 minutes.
 - Upstream's macOS port gave up on Bluetooth reads; its Linux setup uses LE (FA07).
+
+## Wired protocol (found on hardware 2026-10-21)
+
+- Config channel: collection `MI_01&COL06`, vendor page FF00, 520-byte feature report 0x06.
+  A read is `HidD_SetFeature(request)` then `HidD_GetFeature`; the reply echoes the header.
+- Read commands: 0x84 = lighting block (same 128 bytes as wireless 0x44), 0x8A = palettes
+  (= 0x49), 0x83 sub 0/1 = keymap layers (= 0x41). 0x88/0x8B/0x8E/0x91 return firmware code.
+- In wired mode keys 53/59 read as Fn/RCtrl (wireless dumps have RAlt/Fn). Show what's read.
+- Per-key colours and macros: not found yet. Writes and the live stream: not tried yet.
+- References: cloudglides/aula-f75-linux-drivers (MIT; its "colour table" 0x8A is the palette,
+  and its effect numbers are F87's). FaizAsta/Aula-F75-software has no source or licence.
 
 ## How to work here
 

@@ -229,11 +229,14 @@ async fn read_all(state: tauri::State<'_, AppState>) -> std::result::Result<Snap
         let palette = kb.get_palette()?;
         let mut s = Snapshot { mode: Some(kb.mode), ..Default::default() };
         lighting(&mut s, &led, &palette);
-        s.custom = Some(p::colors_from_custom(&kb.get_custom()?));
         s.keymap = Some(vec![entries(&kb.get_matrix(0)?), entries(&kb.get_matrix(1)?)]);
         s.factory_keymap = Some(vec![entries(&p::factory::matrix(0)), entries(&p::factory::matrix(1))]);
-        s.macros = Some(macros_view(&kb.get_macro_store()?));
         s.battery = Some(kb.get_battery()?);
+        // over the cable, where the per-key colours and macros live isn't known yet
+        if kb.mode != device::Mode::Wired {
+            s.custom = Some(p::colors_from_custom(&kb.get_custom()?));
+            s.macros = Some(macros_view(&kb.get_macro_store()?));
+        }
         Ok(s)
     })
     .await

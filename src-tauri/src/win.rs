@@ -1,8 +1,8 @@
 //! Windows HID access to the F75's configuration channel. Ported from aula-f75-hub's
 //! `aula/backends/windows.py` (MIT), which was tested on hardware (2026-10-20).
 
-use crate::device::{derr, Channel, DeviceError, KeyGuard, Mode, Result};
-use crate::protocol::{Packet, PACKET_LEN};
+use crate::device::{derr, Channel, DeviceError, FeatureChannel, KeyGuard, Mode, Result};
+use crate::protocol::{Packet, WiredReport, PACKET_LEN, WIRED_REPORT_LEN};
 use serde::Serialize;
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
@@ -14,8 +14,8 @@ use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{
     SP_DEVICE_INTERFACE_DETAIL_DATA_W,
 };
 use windows_sys::Win32::Devices::HumanInterfaceDevice::{
-    HidD_FreePreparsedData, HidD_GetAttributes, HidD_GetHidGuid, HidD_GetPreparsedData, HidD_GetProductString,
-    HidP_GetCaps, HIDD_ATTRIBUTES, HIDP_CAPS,
+    HidD_FreePreparsedData, HidD_GetAttributes, HidD_GetFeature, HidD_GetHidGuid, HidD_GetPreparsedData,
+    HidD_GetProductString, HidD_SetFeature, HidP_GetCaps, HIDD_ATTRIBUTES, HIDP_CAPS,
 };
 use windows_sys::Win32::Foundation::{
     CloseHandle, GetLastError, ERROR_ACCESS_DENIED, ERROR_IO_PENDING, ERROR_OPERATION_ABORTED, GENERIC_READ, GENERIC_WRITE, HANDLE,
@@ -124,10 +124,10 @@ fn maybe_aula(path: &str) -> bool {
     tail.contains("3554") || tail.contains("258a")
 }
 
-/// The configuration channel of each wireless F75, and a wired one (unsupported) once.
+/// The configuration channel of each F75: the vendor collection with 20-byte reports
+/// (wireless), or the one with the 520-byte feature report (wired).
 pub fn find_devices() -> Vec<DeviceInfo> {
     let mut found = Vec::new();
-    let mut wired = false;
     for path in interface_paths() {
         if !maybe_aula(&path) {
             continue;
@@ -147,10 +147,10 @@ pub fn find_devices() -> Vec<DeviceInfo> {
                 };
                 let c = caps(h);
                 let usage = c.map(|c| (c.UsagePage, c.Usage)).unwrap_or((0, 0));
+                let feature_len = c.map(|c| c.FeatureReportByteLength as usize).unwrap_or(0);
                 if (a.VendorID, a.ProductID) == (VENDOR_WIRED, PID_WIRED) {
-                    if !wired {
-                        found.push(DeviceInfo { path: path.clone(), mode: "wired".into(), supported: false, name });
-                        wired = true;
+                    if feature_len == WIRED_REPORT_LEN {
+                        found.push(DeviceInfo { path: path.clone(), mode: "USB cable".into(), supported: true, name });
                     }
                 } else if a.VendorID == VENDOR_WIRELESS
                     && (a.ProductID == PID_DONGLE || PID_BLUETOOTH.contains(&a.ProductID))
@@ -276,6 +276,48 @@ impl Channel for WinChannel {
     }
 }
 
+/// The wired configuration channel. Feature reports are synchronous, so no overlapped I/O.
+pub struct WiredChannel {
+    h: HANDLE,
+}
+
+impl WiredChannel {
+    pub fn open(path: &str) -> Result<Self> {
+        match open(path, GENERIC_READ | GENERIC_WRITE, 0) {
+            Some(h) => Ok(WiredChannel { h }),
+            None if unsafe { GetLastError() } == ERROR_ACCESS_DENIED => derr(
+                "Can't open the keyboard: access denied. Close the official AULA app (and other keyboard tools), then try again.",
+            ),
+            None => derr(format!("Can't open the keyboard (Windows error {}).", unsafe { GetLastError() })),
+        }
+    }
+}
+
+// as for WinChannel: used from one thread at a time
+unsafe impl Send for WiredChannel {}
+
+impl FeatureChannel for WiredChannel {
+    fn set(&mut self, report: &WiredReport) -> Result<()> {
+        if unsafe { HidD_SetFeature(self.h, report.as_ptr() as *const c_void, WIRED_REPORT_LEN as u32) } == 0 {
+            return Err(WinChannel::last_error("Writing to the keyboard failed"));
+        }
+        Ok(())
+    }
+
+    fn get(&mut self, report: &mut WiredReport) -> Result<()> {
+        if unsafe { HidD_GetFeature(self.h, report.as_mut_ptr() as *mut c_void, WIRED_REPORT_LEN as u32) } == 0 {
+            return Err(WinChannel::last_error("Reading from the keyboard failed"));
+        }
+        Ok(())
+    }
+}
+
+impl Drop for WiredChannel {
+    fn drop(&mut self) {
+        unsafe { CloseHandle(self.h) };
+    }
+}
+
 impl Drop for WinChannel {
     fn drop(&mut self) {
         unsafe {
@@ -329,14 +371,16 @@ impl KeyGuard for WinKeyGuard {
 /// Open the keyboard: the one supported channel, or (several candidates) the one that answers.
 pub fn open_keyboard() -> Result<crate::device::Keyboard> {
     let all = find_devices();
-    let devs: Vec<&DeviceInfo> = all.iter().filter(|d| d.supported).collect();
+    let mut devs: Vec<&DeviceInfo> = all.iter().filter(|d| d.supported).collect();
+    // Windows keeps listing a paired Bluetooth keyboard while it's on the cable: try the cable first
+    devs.sort_by_key(|d| d.mode != "USB cable");
     if devs.is_empty() {
-        if !all.is_empty() {
-            return derr("The keyboard is connected by cable. Wired mode isn't supported yet: use the 2.4G dongle or Bluetooth.");
-        }
-        return derr("AULA F75 not found. Is the dongle plugged in and the keyboard switched on (2.4G or Bluetooth)?");
+        return derr("AULA F75 not found. Is the dongle plugged in and the keyboard switched on (2.4G or Bluetooth), or the cable plugged in with the switch on wired?");
     }
     let make = |d: &DeviceInfo| -> Result<crate::device::Keyboard> {
+        if d.mode == "USB cable" {
+            return Ok(crate::device::Keyboard::wired(Box::new(WiredChannel::open(&d.path)?), Box::new(WinKeyGuard::new())));
+        }
         let mode = if d.mode == "Bluetooth" { Mode::Bluetooth } else { Mode::Dongle };
         Ok(crate::device::Keyboard::new(mode, Box::new(WinChannel::open(&d.path)?), Box::new(WinKeyGuard::new())))
     };

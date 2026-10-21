@@ -44,6 +44,26 @@ pub trait Channel: Send {
     }
 }
 
+/// The wired configuration channel: 520-byte feature reports (see `protocol.rs`).
+pub trait FeatureChannel: Send {
+    fn set(&mut self, report: &p::WiredReport) -> Result<()>;
+    fn get(&mut self, report: &mut p::WiredReport) -> Result<()>;
+}
+
+const NOT_ON_CABLE: &str = "This isn't available over the USB cable yet. Use the 2.4G dongle or Bluetooth for it.";
+
+/// Stands in for the packet channel in wired mode, where only the table reads work so far.
+struct NoPackets;
+
+impl Channel for NoPackets {
+    fn write(&mut self, _: &Packet) -> Result<()> {
+        derr(NOT_ON_CABLE)
+    }
+    fn recv(&mut self, _: Duration) -> Result<Option<Vec<u8>>> {
+        derr(NOT_ON_CABLE)
+    }
+}
+
 /// Knows whether a key is held. While the keyboard answers configuration traffic it can
 /// drop the release report of a key pressed at that moment, and the OS then auto-repeats
 /// that key, so the keyboard is only talked to while no key is held.
@@ -57,11 +77,14 @@ pub enum Mode {
     Dongle,
     #[serde(rename = "Bluetooth")]
     Bluetooth,
+    #[serde(rename = "USB cable")]
+    Wired,
 }
 
 pub struct Keyboard {
     pub mode: Mode,
     ch: Box<dyn Channel>,
+    feature: Option<Box<dyn FeatureChannel>>,
     guard: Box<dyn KeyGuard>,
     timeout: Duration,
     last_write: Option<Instant>,
@@ -69,7 +92,11 @@ pub struct Keyboard {
 
 impl Keyboard {
     pub fn new(mode: Mode, ch: Box<dyn Channel>, guard: Box<dyn KeyGuard>) -> Self {
-        Keyboard { mode, ch, guard, timeout: Duration::from_secs(1), last_write: None }
+        Keyboard { mode, ch, feature: None, guard, timeout: Duration::from_secs(1), last_write: None }
+    }
+
+    pub fn wired(feature: Box<dyn FeatureChannel>, guard: Box<dyn KeyGuard>) -> Self {
+        Keyboard { feature: Some(feature), ..Keyboard::new(Mode::Wired, Box::new(NoPackets), guard) }
     }
 
     fn bluetooth(&self) -> bool {
@@ -93,6 +120,9 @@ impl Keyboard {
 
     /// Quick single read: does the keyboard answer on this channel?
     pub fn probe(&mut self) -> Result<bool> {
+        if self.feature.is_some() {
+            return Ok(self.wired_read(p::WIRED_READ_LED, 0, p::LED_LEN).is_ok());
+        }
         self.wait_keys_released()?;
         self.ch.drain()?;
         self.ch.write(&p::read_request(p::CMD_PROFILE, 0))?;
@@ -175,6 +205,25 @@ impl Keyboard {
         }
     }
 
+    /// Read a table over the cable: the request, then its reply (a few tries, as the
+    /// official app does).
+    fn wired_read(&mut self, cmd: u8, sub: u8, len: usize) -> Result<Vec<u8>> {
+        self.wait_keys_released()?;
+        let Some(f) = self.feature.as_mut() else { return derr(NOT_ON_CABLE) };
+        for _ in 0..3 {
+            f.set(&p::wired_read_request(cmd, sub))?;
+            sleep(Duration::from_millis(10));
+            let mut r = [0u8; p::WIRED_REPORT_LEN];
+            r[0] = p::WIRED_REPORT_ID;
+            f.get(&mut r)?;
+            if let Some(d) = p::wired_reply(&r, cmd, sub, len) {
+                return Ok(d);
+            }
+            sleep(Duration::from_millis(100));
+        }
+        derr(format!("Read 0x{cmd:02x} over the cable got no matching reply. Try again."))
+    }
+
     /// Write data in 14-byte packets; the keyboard echoes each one back as an ack.
     pub fn write(&mut self, cmd: u8, sub: u8, data: &[u8]) -> Result<()> {
         self.settle(Duration::from_millis(300));
@@ -236,6 +285,9 @@ impl Keyboard {
     // ------------------------------------------------------------ tables
 
     pub fn get_led(&mut self) -> Result<p::LedConfig> {
+        if self.feature.is_some() {
+            return Ok(p::LedConfig::parse(&self.wired_read(p::WIRED_READ_LED, 0, p::LED_LEN)?)?);
+        }
         Ok(p::LedConfig::parse(&self.read(p::CMD_SET_LED, 0)?)?)
     }
 
@@ -253,6 +305,9 @@ impl Keyboard {
     }
 
     pub fn get_matrix(&mut self, layer: u8) -> Result<Vec<u8>> {
+        if self.feature.is_some() {
+            return self.wired_read(p::WIRED_READ_MATRIX, layer, p::MATRIX_BYTES);
+        }
         self.read_sized(p::CMD_SET_MATRIX, layer, p::MATRIX_BYTES)
     }
 
@@ -262,6 +317,9 @@ impl Keyboard {
     }
 
     pub fn get_palette(&mut self) -> Result<Vec<u8>> {
+        if self.feature.is_some() {
+            return self.wired_read(p::WIRED_READ_PALETTE, 0, p::PALETTE_LEN);
+        }
         self.read_sized(p::CMD_SET_PALETTE, 0, p::PALETTE_LEN)
     }
 
@@ -281,6 +339,9 @@ impl Keyboard {
 
     /// Battery percentage (experimental: first byte of the 0x4a reply).
     pub fn get_battery(&mut self) -> Result<Option<u8>> {
+        if self.mode == Mode::Wired {
+            return Ok(None); // the cable has no battery report
+        }
         let d = self.read(p::CMD_PROFILE, 0)?;
         Ok(d.first().copied().filter(|&b| b <= 100))
     }
@@ -387,5 +448,41 @@ mod tests {
         let w = written.lock().unwrap();
         assert_eq!(w.len(), 11); // packet 0 sent twice, then 1..9
         assert_eq!(w[0], w[1]);
+    }
+
+    /// A fake wired keyboard: answers a read request with the table, on the next get.
+    struct FakeWired {
+        tables: BTreeMap<(u8, u8), Vec<u8>>,
+        reply: Option<p::WiredReport>,
+    }
+
+    impl FeatureChannel for FakeWired {
+        fn set(&mut self, report: &p::WiredReport) -> Result<()> {
+            let mut r = *report;
+            let data = self.tables.get(&(report[1], report[2])).cloned().unwrap_or_default();
+            r[p::WIRED_HEADER..p::WIRED_HEADER + data.len()].copy_from_slice(&data);
+            self.reply = Some(r);
+            Ok(())
+        }
+        fn get(&mut self, report: &mut p::WiredReport) -> Result<()> {
+            *report = self.reply.take().unwrap_or([0; p::WIRED_REPORT_LEN]);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn wired_reads_tables_and_refuses_the_rest() {
+        let mut tables = BTreeMap::new();
+        tables.insert((p::WIRED_READ_LED, 0), p::factory::led());
+        tables.insert((p::WIRED_READ_PALETTE, 0), p::factory::palette());
+        tables.insert((p::WIRED_READ_MATRIX, 1), p::factory::matrix(1));
+        let mut kb = Keyboard::wired(Box::new(FakeWired { tables, reply: None }), Box::new(NoGuard));
+        assert!(kb.probe().unwrap());
+        assert_eq!(kb.get_led().unwrap().0.to_vec(), p::factory::led());
+        assert_eq!(kb.get_palette().unwrap(), p::factory::palette());
+        assert_eq!(kb.get_matrix(1).unwrap(), p::factory::matrix(1));
+        assert_eq!(kb.get_battery().unwrap(), None);
+        assert!(kb.get_custom().unwrap_err().0.contains("USB cable"));
+        assert!(kb.set_led(&p::LedConfig::parse(&p::factory::led()).unwrap()).is_err());
     }
 }
