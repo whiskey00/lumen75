@@ -4,6 +4,7 @@ mod app;
 pub mod audio;
 pub mod device;
 pub mod keymap;
+pub mod league;
 pub mod macros;
 pub mod protocol;
 #[cfg(windows)]
