@@ -157,7 +157,9 @@ export interface AudioFrame {
   device: string;
 }
 
-export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient";
+export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "image";
+/** How a picture is laid over the board. */
+export type ImageFit = "fill" | "fit" | "stretch";
 export type AnimDirection = "right" | "left" | "up" | "down";
 
 export interface AnimSettings {
@@ -169,6 +171,16 @@ export interface AnimSettings {
   /** 0.05 - 1 */
   brightness: number;
   direction: AnimDirection;
+  /** For "image": the app's copy of the picture. */
+  image: string | null;
+  fit: ImageFit;
+}
+
+export interface ImageInfo {
+  path: string;
+  name: string;
+  frames: number;
+  seconds: number;
 }
 
 export interface AnimState {
@@ -280,6 +292,7 @@ export const api = {
   leagueSet: (change: { on?: boolean; setup?: LeagueSetup }) => invoke<LeagueState>("league_set", change),
   leaguePresetSave: (name: string, setup: LeagueSetup) => invoke<Presets>("league_preset_save", { name, setup }),
   animGet: () => invoke<AnimState>("anim_get"),
+  animImageImport: (path: string) => invoke<ImageInfo>("anim_image_import", { path }),
   animStart: (settings: AnimSettings) => invoke<AnimState>("anim_start", { settings }),
   animUpdate: (settings: AnimSettings) => invoke<void>("anim_update", { settings }),
   animStop: () => invoke<AnimState>("anim_stop"),

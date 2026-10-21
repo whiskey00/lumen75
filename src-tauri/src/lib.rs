@@ -4,6 +4,7 @@ mod app;
 pub mod audio;
 pub mod device;
 pub mod gamelight;
+pub mod imagelight;
 pub mod keymap;
 pub mod league;
 pub mod macros;
@@ -727,7 +728,7 @@ pub fn run() {
             audio_running, audio_devices, app::anim_get, app::anim_start, app::anim_update, app::anim_stop,
             app::app_settings_get, app::app_settings_set, app::presets_get, app::anim_preset_save,
             app::perkey_preset_save, app::audio_preset_save, app::preset_delete, app::league_get, app::league_set,
-            app::league_preset_save
+            app::league_preset_save, app::anim_image_import
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

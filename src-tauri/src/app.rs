@@ -220,6 +220,41 @@ pub async fn anim_start(app: AppHandle, settings: anim::Settings) -> Result<Anim
     Ok(anim_state(&app))
 }
 
+#[derive(Serialize)]
+pub struct ImageInfo {
+    /// The app's own copy, which the animation and presets point to.
+    path: String,
+    name: String,
+    frames: usize,
+    seconds: f32,
+}
+
+/// Check that a picture plays, then keep a copy in the app's folder, so moving or deleting
+/// the original doesn't break the animation or a preset. Copies are named by content, so
+/// choosing the same picture twice keeps one copy.
+#[tauri::command]
+pub async fn anim_image_import(app: AppHandle, path: String) -> Result<ImageInfo, String> {
+    use std::hash::{Hash, Hasher};
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("images");
+    tauri::async_runtime::spawn_blocking(move || {
+        let src = PathBuf::from(&path);
+        let clip = crate::imagelight::load(&src, crate::imagelight::Fit::Fill)?;
+        let bytes = std::fs::read(&src).map_err(|e| format!("Can't read the image: {e}"))?;
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        bytes.hash(&mut h);
+        let name = src.file_name().and_then(|n| n.to_str()).unwrap_or("image").to_string();
+        let folder = dir.join(format!("{:016x}", h.finish()));
+        let dest = folder.join(&name);
+        if !dest.exists() {
+            std::fs::create_dir_all(&folder).map_err(|e| format!("Can't keep a copy of the image: {e}"))?;
+            std::fs::write(&dest, &bytes).map_err(|e| format!("Can't keep a copy of the image: {e}"))?;
+        }
+        Ok(ImageInfo { path: dest.to_string_lossy().into_owned(), name, frames: clip.frames(), seconds: clip.seconds() })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// New settings: saved, and applied at once if the animation runs.
 #[tauri::command]
 pub fn anim_update(app: AppHandle, settings: anim::Settings) {

@@ -217,7 +217,7 @@ pub mod run {
                     let fraction = tracker.respawn_fraction(s);
                     let groups = crate::anim::fit(render(&setup2.lock().unwrap(), s, fraction, &mut active, &leds, now));
                     match crate::device::send_frame(&kb, open, &groups) {
-                        Ok(()) => send_failures = 0,
+                        Ok(_) => send_failures = 0,
                         Err(e) => {
                             report(&mut send_failures, e);
                             std::thread::sleep(Duration::from_millis(500));

@@ -27,6 +27,8 @@ pub enum Kind {
     Sparkle,
     /// Your colours spread across the board, standing still.
     Gradient,
+    /// A GIF or picture played on the keys (see `imagelight`).
+    Image,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,6 +51,10 @@ pub struct Settings {
     /// 0.05 - 1.0
     pub brightness: f32,
     pub direction: Direction,
+    /// For Image: the picture (the app's own copy of it).
+    pub image: Option<String>,
+    /// For Image: how the picture is laid over the board.
+    pub fit: crate::imagelight::Fit,
 }
 
 impl Default for Settings {
@@ -59,6 +65,8 @@ impl Default for Settings {
             speed: 1.0,
             brightness: 1.0,
             direction: Direction::Right,
+            image: None,
+            fit: crate::imagelight::Fit::Fill,
         }
     }
 }
@@ -148,6 +156,7 @@ pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
             let c = scale(colors[i], v * bright);
             bands.insert(0, (c, leds.iter().map(|l| l.index).collect()));
         }
+        Kind::Image => {} // drawn by render_image, from the decoded picture
         Kind::Sparkle => {
             let base = scale(color_at(&colors, 0.0), 0.12 * bright);
             let mut twinkles: BTreeMap<usize, (Rgb, Vec<u8>)> = BTreeMap::new();
@@ -179,25 +188,42 @@ pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
     merged.into_iter().filter(|(c, _)| *c != [0, 0, 0]).collect()
 }
 
+/// An image animation's frame at time `t`: every key its own colour, so on 2.4G and
+/// Bluetooth the frame is merged down to fit (see `fit`); over the cable it shows as it is.
+pub fn render_image(clip: &crate::imagelight::Clip, s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
+    let bright = s.brightness.clamp(0.05, 1.0);
+    let mut groups: BTreeMap<Rgb, Vec<u8>> = BTreeMap::new();
+    for &(index, c) in clip.at(t * s.speed.clamp(0.1, 3.0)) {
+        groups.entry(scale(c, bright)).or_default().push(index);
+    }
+    groups.into_iter().filter(|(c, _)| *c != [0, 0, 0]).collect()
+}
+
 fn distance(a: Rgb, b: Rgb) -> u32 {
     (0..3).map(|i| (a[i] as i32 - b[i] as i32).unsigned_abs()).max().unwrap()
 }
 
-/// Merge the two closest-coloured groups until the frame fits the budget (rare).
+/// Merge groups until the frame fits the budget: each time the pair that changes least,
+/// weighing the colour difference by how many keys change (so a few odd keys merge before
+/// big areas do). The merged group takes the keys' average colour.
 pub(crate) fn fit(mut groups: Vec<(Rgb, Vec<u8>)>) -> Vec<(Rgb, Vec<u8>)> {
     let bytes = |g: &[(Rgb, Vec<u8>)]| g.iter().map(|(_, k)| 4 + k.len()).sum::<usize>();
     while groups.len() > 1 && bytes(&groups) > crate::protocol::LIVE_BUDGET {
-        let mut best = (0, 1, u32::MAX);
+        let mut best = (0, 1, f32::MAX);
         for i in 0..groups.len() {
             for j in i + 1..groups.len() {
-                let d = distance(groups[i].0, groups[j].0);
-                if d < best.2 {
-                    best = (i, j, d);
+                let (a, b) = (groups[i].1.len() as f32, groups[j].1.len() as f32);
+                let cost = distance(groups[i].0, groups[j].0) as f32 * a * b / (a + b).max(1.0);
+                if cost < best.2 {
+                    best = (i, j, cost);
                 }
             }
         }
-        let (_, keys) = groups.remove(best.1);
-        groups[best.0].1.extend(keys);
+        let (c2, keys) = groups.remove(best.1);
+        let (c1, k1) = &mut groups[best.0];
+        let (n1, n2) = (k1.len() as u32, keys.len() as u32);
+        *c1 = [0, 1, 2].map(|i| ((c1[i] as u32 * n1 + c2[i] as u32 * n2) / (n1 + n2).max(1)) as u8);
+        k1.extend(keys);
     }
     groups
 }
@@ -272,6 +298,8 @@ pub mod run {
             let period = Duration::from_secs_f32(1.0 / crate::audio::FPS as f32);
             let mut failures = 0u32;
             let mut was_paused = false;
+            // the decoded picture, for the image and fit it was loaded with
+            let mut clip: Option<(Option<String>, crate::imagelight::Fit, Option<crate::imagelight::Clip>)> = None;
             while !stop2.load(Ordering::Relaxed) {
                 let tick = Instant::now();
                 let limit = idle2.load(Ordering::Relaxed);
@@ -287,18 +315,37 @@ pub mod run {
                 }
                 was_paused = false;
                 let s = shared2.lock().unwrap().clone();
-                let groups = fit(render(&leds, &s, started.elapsed().as_secs_f32()));
-                let sent = crate::device::send_frame(&kb, open, &groups);
-                match sent {
-                    Ok(()) => failures = 0,
+                let t = started.elapsed().as_secs_f32();
+                let groups = if s.kind == Kind::Image {
+                    if clip.as_ref().is_none_or(|(image, fit, _)| *image != s.image || *fit != s.fit) {
+                        let loaded = match &s.image {
+                            None => Err("Choose a GIF or picture first.".to_string()),
+                            Some(path) => crate::imagelight::load(std::path::Path::new(path), s.fit),
+                        };
+                        if let Err(e) = &loaded {
+                            emit(Event::Error(e.clone()));
+                        }
+                        clip = Some((s.image.clone(), s.fit, loaded.ok()));
+                    }
+                    clip.as_ref().and_then(|c| c.2.as_ref()).map_or_else(Vec::new, |c| render_image(c, &s, t))
+                } else {
+                    render(&leds, &s, t)
+                };
+                // what the keyboard got (merged to fit over 2.4G and Bluetooth), for the preview
+                let groups = match crate::device::send_frame(&kb, open, &groups) {
+                    Ok(sent) => {
+                        failures = 0;
+                        sent
+                    }
                     Err(e) => {
                         failures += 1;
                         if failures == 1 || failures % 30 == 0 {
                             emit(Event::Error(e));
                         }
                         std::thread::sleep(Duration::from_millis(500));
+                        groups
                     }
-                }
+                };
                 let keys = groups.iter().flat_map(|(c, ks)| ks.iter().map(move |&i| (i, *c))).collect();
                 emit(Event::Frame(FrameEvent { keys, paused: false }));
                 if let Some(rest) = period.checked_sub(tick.elapsed()) {
@@ -333,6 +380,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_colour_per_key_is_merged_to_fit_with_every_key_kept() {
+        let leds = leds();
+        let groups: Vec<(Rgb, Vec<u8>)> =
+            leds.iter().enumerate().map(|(i, l)| ([(i * 3) as u8, 255 - (i * 3) as u8, (i * 7 % 256) as u8], vec![l.index])).collect();
+        let merged = fit(groups);
+        assert!(encode(&merged).is_ok());
+        assert_eq!(merged.iter().map(|g| g.1.len()).sum::<usize>(), 80);
+        // two equal halves merge to their average
+        let two = fit(vec![([200, 0, 0], (0..60).collect()), ([0, 0, 100], (60..120).collect())]);
+        assert_eq!(two, vec![([100, 0, 50], (0..120).collect())]);
     }
 
     #[test]

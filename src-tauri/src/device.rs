@@ -327,11 +327,15 @@ impl Keyboard {
     /// acknowledged, so a lost packet loses the frame; the gap between packets keeps that rare.
     /// Without a new frame the keyboard goes back to its own effect after about 2 seconds.
     /// Typing keeps working while frames stream, so the key guard is skipped (tested upstream).
-    pub fn send_live(&mut self, groups: &[(p::Rgb, Vec<u8>)]) -> Result<()> {
+    /// Returns what was shown: over 2.4G and Bluetooth a frame with too many colours is
+    /// merged down to fit (`anim::fit`); the cable shows every key's own colour.
+    pub fn send_live(&mut self, groups: &[(p::Rgb, Vec<u8>)]) -> Result<Vec<(p::Rgb, Vec<u8>)>> {
         if let Some(f) = self.feature.as_mut() {
-            return f.set(&p::wired_live_frame(groups)); // one report, every key's own colour
+            f.set(&p::wired_live_frame(groups))?; // one report, every key's own colour
+            return Ok(groups.to_vec());
         }
-        let frame = p::live_frame(groups)?;
+        let groups = crate::anim::fit(groups.to_vec());
+        let frame = p::live_frame(&groups)?;
         if frame.len() > p::LIVE_BUDGET {
             return derr(format!("frame too long ({} bytes)", frame.len()));
         }
@@ -340,7 +344,8 @@ impl Keyboard {
             self.ch.write(&pkt)?;
             sleep(Duration::from_millis(gap));
         }
-        self.ch.drain()
+        self.ch.drain()?;
+        Ok(groups)
     }
 
     // ------------------------------------------------------------ tables
@@ -426,7 +431,7 @@ pub fn send_frame(
     kb: &std::sync::Mutex<Option<Keyboard>>,
     open: fn() -> Result<Keyboard>,
     groups: &[(p::Rgb, Vec<u8>)],
-) -> std::result::Result<(), String> {
+) -> std::result::Result<Vec<(p::Rgb, Vec<u8>)>, String> {
     let mut guard = kb.lock().map_err(|_| "keyboard lock poisoned".to_string())?;
     if guard.is_none() {
         *guard = Some(open().map_err(|e| e.0)?);

@@ -414,7 +414,7 @@ pub mod run {
                 let groups = render(&leds, &levels, &s, started.elapsed().as_secs_f32());
                 let sent = crate::device::send_frame(&kb, open, &groups);
                 match sent {
-                    Ok(()) => failures = 0,
+                    Ok(_) => failures = 0,
                     Err(e) => {
                         failures += 1;
                         if failures == 1 || failures % 30 == 0 {
