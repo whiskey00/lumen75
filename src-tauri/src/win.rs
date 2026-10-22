@@ -427,6 +427,70 @@ pub fn open_keyboard() -> Result<crate::device::Keyboard> {
     derr("The keyboard didn't answer. It may be asleep: press any key to wake it, then try again.")
 }
 
+/// The battery level Windows itself reports for a paired Bluetooth F75 (it reads the standard
+/// Bluetooth battery service on its own), or None. Costs no traffic to the keyboard, unlike
+/// the vendor battery read, which is slow over Bluetooth.
+pub fn bluetooth_battery() -> Option<u8> {
+    use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{CM_Get_DevNode_PropertyW, CM_Get_Parent, CR_SUCCESS, SP_DEVINFO_DATA};
+    use windows_sys::Win32::Devices::Properties::DEVPROPKEY;
+    // DEVPKEY_Bluetooth_Battery: a byte, in percent
+    let key = DEVPROPKEY { fmtid: GUID::from_u128(0x104ea319_6ee2_4701_bd47_8ddbf425bbe5), pid: 2 };
+    const DEVPROP_TYPE_BYTE: u32 = 3;
+    unsafe {
+        let mut guid: GUID = zeroed();
+        HidD_GetHidGuid(&mut guid);
+        let info = SetupDiGetClassDevsW(&guid, std::ptr::null(), std::ptr::null_mut(), DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+        if info == 0 || info == -1 {
+            return None;
+        }
+        let mut found = None;
+        let mut i = 0;
+        'next: loop {
+            let mut iface: SP_DEVICE_INTERFACE_DATA = zeroed();
+            iface.cbSize = size_of::<SP_DEVICE_INTERFACE_DATA>() as u32;
+            if SetupDiEnumDeviceInterfaces(info, std::ptr::null(), &guid, i, &mut iface) == 0 {
+                break;
+            }
+            i += 1;
+            let mut need = 0u32;
+            SetupDiGetDeviceInterfaceDetailW(info, &iface, std::ptr::null_mut(), 0, &mut need, std::ptr::null_mut());
+            if need == 0 {
+                continue;
+            }
+            let mut buf = vec![0u32; (need as usize).div_ceil(4)];
+            let detail = buf.as_mut_ptr() as *mut SP_DEVICE_INTERFACE_DETAIL_DATA_W;
+            (*detail).cbSize = size_of::<SP_DEVICE_INTERFACE_DETAIL_DATA_W>() as u32;
+            let mut dev: SP_DEVINFO_DATA = zeroed();
+            dev.cbSize = size_of::<SP_DEVINFO_DATA>() as u32;
+            if SetupDiGetDeviceInterfaceDetailW(info, &iface, detail, need, std::ptr::null_mut(), &mut dev) == 0 {
+                continue;
+            }
+            let p = (*detail).DevicePath.as_ptr();
+            let len = (0..).take_while(|&n| *p.add(n) != 0).count();
+            let path = String::from_utf16_lossy(std::slice::from_raw_parts(p, len)).to_lowercase();
+            if !(maybe_aula(&path) && (path.contains("pid&fa07") || path.contains("pid&fa08"))) {
+                continue;
+            }
+            // the level sits on the Bluetooth device node, a few levels above the HID collection
+            let mut node = dev.DevInst;
+            for _ in 0..6 {
+                let (mut ty, mut value, mut size) = (0u32, [0u8; 4], 4u32);
+                if CM_Get_DevNode_PropertyW(node, &key, &mut ty, value.as_mut_ptr(), &mut size, 0) == CR_SUCCESS && ty == DEVPROP_TYPE_BYTE {
+                    found = Some(value[0].min(100));
+                    break 'next;
+                }
+                let mut parent = 0u32;
+                if CM_Get_Parent(&mut parent, node, 0) != CR_SUCCESS {
+                    break;
+                }
+                node = parent;
+            }
+        }
+        SetupDiDestroyDeviceInfoList(info);
+        found
+    }
+}
+
 /// Is the official AULA app (OemDrv.exe) running? It uses the same channel.
 pub fn vendor_app_running() -> bool {
     process_running("OemDrv.exe")

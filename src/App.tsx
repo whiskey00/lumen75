@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { api, Board, Catalog, Connection, merge, Playing, ReadProgress, Snapshot, Status } from "@/lib/api";
+import { api, Board, Catalog, Connection, merge, Playing, ReadPart, ReadProgress, Snapshot, Status } from "@/lib/api";
 import { LightingPage } from "@/pages/lighting";
 import { PerKeyPage } from "@/pages/perkey";
 import { KeysPage } from "@/pages/keys";
@@ -51,6 +51,31 @@ const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; bo
 ];
 
 const CABLE = "USB cable";
+
+/** Everything the app reads from the keyboard, and what each page needs of it. */
+const ALL_PARTS: ReadPart[] = ["lighting", "keymap", "battery", "custom", "macros"];
+const PAGE_PARTS: Partial<Record<Page, ReadPart[]>> = {
+  lighting: ["lighting"],
+  perkey: ["custom", "lighting"],
+  keys: ["keymap", "macros"],
+  macros: ["macros", "keymap"],
+  device: ["lighting"],
+};
+
+/**
+ * What was last read from the keyboard, kept in this app. The keyboard stores the same
+ * settings whatever the connection, so over Bluetooth (where reading everything takes about
+ * 2 minutes) the app opens with this and reads only what the page in front needs.
+ */
+const REMEMBERED = "lumen75.board";
+function remembered(): Board | null {
+  try {
+    const b = JSON.parse(localStorage.getItem(REMEMBERED) ?? "null");
+    return b && b.effects && b.keymap ? { ...b, battery: null } : null;
+  } catch {
+    return null;
+  }
+}
 const WELCOMED = "lumen75.welcomed";
 
 /** The connection choices, with the device mode each one finds (none: any). */
@@ -92,6 +117,12 @@ export default function App() {
 
   const refreshStatus = useCallback(() => api.status().then(setStatus).catch(() => {}), []);
 
+  // tables read since the app started (the rest of `board` may come from memory)
+  const fresh = useRef<Set<ReadPart>>(new Set());
+  const [bluetooth, setBluetooth] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  /** Read everything (start-up over 2.4G and the cable, and Refresh). */
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -99,6 +130,8 @@ export default function App() {
     try {
       const s = await api.readAll();
       setBoard(merge(null, s));
+      fresh.current = new Set(ALL_PARTS);
+      setBluetooth(s.mode === "Bluetooth");
     } catch (e) {
       setError(friendly(e));
     } finally {
@@ -107,11 +140,54 @@ export default function App() {
     }
   }, [refreshStatus]);
 
+  /** Read some tables into what's shown, in the background. */
+  const readParts = useCallback(async (parts: ReadPart[]) => {
+    setUpdating(true);
+    setProgress(null);
+    try {
+      const s = await api.readParts(parts);
+      setBoard((b) => merge(b, s));
+      parts.forEach((p) => fresh.current.add(p));
+    } catch (e) {
+      // not asked again automatically (Refresh reads everything)
+      parts.forEach((p) => fresh.current.add(p));
+      toast.error("Can't read the keyboard", { description: friendly(e) });
+    } finally {
+      setUpdating(false);
+    }
+  }, []);
+
+  /** Start-up: over Bluetooth with something remembered, open with that and read little. */
+  const start = useCallback(async () => {
+    fresh.current = new Set();
+    const memory = remembered();
+    if (!memory) return reload();
+    let mode: string;
+    try {
+      mode = await api.connectionMode();
+    } catch {
+      return reload(); // not reachable: the usual "can't reach" card and Try again
+    }
+    if (mode !== "Bluetooth") return reload();
+    setBluetooth(true);
+    setBoard({ ...memory, mode });
+  }, [reload]);
+
   useEffect(() => {
     api.catalog().then(setCatalog);
     api.appSettingsGet().then((s) => setConnection(s.connection)).catch(() => {});
-    reload();
-  }, [reload]);
+    start();
+  }, [start]);
+
+  // keep what was read, for the next start over Bluetooth
+  useEffect(() => {
+    if (!board) return;
+    try {
+      localStorage.setItem(REMEMBERED, JSON.stringify({ ...board, battery: null }));
+    } catch {
+      /* storage unavailable: the next start reads everything */
+    }
+  }, [board]);
 
   const chooseConnection = async (c: Connection) => {
     setConnection(c);
@@ -122,7 +198,7 @@ export default function App() {
       setError(friendly(e));
       return;
     }
-    reload();
+    start();
   };
 
   useEffect(() => {
@@ -182,6 +258,13 @@ export default function App() {
   const off = (p: Page) => (s75Mode ? !S75_PAGES.includes(p) : onCable && !!PAGES.find((x) => x.id === p)?.wireless);
   const shown: Page = off(page) ? "lighting" : page;
   const waitsForBoard = !s75Mode && !!PAGES.find((p) => p.id === shown)?.board && !board;
+
+  // over Bluetooth, read what this page needs (and the battery) the first time it's opened
+  useEffect(() => {
+    if (!bluetooth || !board || s75Mode || updating || loading) return;
+    const missing = [...(PAGE_PARTS[shown] ?? []), "battery" as ReadPart].filter((p) => !fresh.current.has(p));
+    if (missing.length) readParts(missing);
+  }, [bluetooth, board, shown, s75Mode, updating, loading, readParts]);
   const PLAYING_PAGE: Record<Playing["kind"], Page> = { animation: "animations", audio: "audio", league: "games" };
 
   return (
@@ -272,6 +355,12 @@ export default function App() {
               <Badge variant="outline" className="text-muted-foreground">
                 Not connected
               </Badge>
+            )}
+            {updating && (
+              <span className="text-muted-foreground flex items-center gap-1.5 text-xs" title="Over Bluetooth only what this page needs is read; the rest shows what was last read">
+                <Loader2 className="size-3.5 animate-spin" />
+                {progress ? `Reading ${progress.what}…` : "Updating…"}
+              </span>
             )}
             {board?.battery != null && <Battery pct={board.battery} />}
             <Button size="sm" variant="ghost" disabled={busy || loading} onClick={reload} title="Read everything from the keyboard again">

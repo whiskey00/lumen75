@@ -264,39 +264,74 @@ async fn status(state: tauri::State<'_, AppState>) -> std::result::Result<Status
 /// Read everything the UI shows.
 #[tauri::command]
 async fn read_all(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> std::result::Result<Snapshot, String> {
+    let all = ["lighting", "keymap", "battery", "custom", "macros"].map(String::from).to_vec();
+    read_parts(app, state, all).await
+}
+
+/// Read only some of the keyboard's tables: "lighting" (lighting block and colours, which
+/// also hold the device settings), "keymap" (both layers), "battery", "custom" (per-key
+/// colours) and "macros". Over Bluetooth every table is slow, so the app reads only what the
+/// page in front needs.
+#[tauri::command]
+async fn read_parts(app: tauri::AppHandle, state: tauri::State<'_, AppState>, parts: Vec<String>) -> std::result::Result<Snapshot, String> {
     use tauri::Emitter;
     with_kb(state, move |kb| {
-        // each table is a separate read (slow over Bluetooth), so the page can show progress
         let wired = kb.mode == device::Mode::Wired;
-        let total = if wired { 5 } else { 7 };
+        let want = |p: &str| parts.iter().any(|x| x == p);
+        // over the cable, where the per-key colours and macros live isn't known yet
+        let custom = want("custom") && !wired;
+        let macros = want("macros") && !wired;
+        let total = 2 * want("lighting") as u32 + 2 * want("keymap") as u32 + want("battery") as u32 + custom as u32 + macros as u32;
+        // each table is a separate read (slow over Bluetooth), so the page can show progress
         let mut step = 0;
         let mut next = |what: &str| {
             step += 1;
             let _ = app.emit("read-progress", ReadProgress { step, total, what: what.into() });
         };
-        next("lighting");
-        let led = kb.get_led()?;
-        next("colours");
-        let palette = kb.get_palette()?;
         let mut s = Snapshot { mode: Some(kb.mode), ..Default::default() };
-        lighting(&mut s, &led, &palette);
-        next("the keymap");
-        let base = entries(&kb.get_matrix(0)?);
-        next("the Fn layer");
-        s.keymap = Some(vec![base, entries(&kb.get_matrix(1)?)]);
-        s.factory_keymap = Some(vec![entries(&p::factory::matrix(0)), entries(&p::factory::matrix(1))]);
-        next("the battery");
-        s.battery = Some(kb.get_battery()?);
-        // over the cable, where the per-key colours and macros live isn't known yet
-        if !wired {
+        if want("lighting") {
+            next("lighting");
+            let led = kb.get_led()?;
+            next("colours");
+            let palette = kb.get_palette()?;
+            lighting(&mut s, &led, &palette);
+        }
+        if want("keymap") {
+            next("the keymap");
+            let base = entries(&kb.get_matrix(0)?);
+            next("the Fn layer");
+            s.keymap = Some(vec![base, entries(&kb.get_matrix(1)?)]);
+            s.factory_keymap = Some(vec![entries(&p::factory::matrix(0)), entries(&p::factory::matrix(1))]);
+        }
+        if want("battery") {
+            next("the battery");
+            // over Bluetooth Windows already knows the level: no keyboard traffic needed
+            #[cfg(windows)]
+            let from_windows = if kb.mode == device::Mode::Bluetooth { win::bluetooth_battery() } else { None };
+            #[cfg(not(windows))]
+            let from_windows = None;
+            s.battery = Some(match from_windows {
+                Some(b) => Some(b),
+                None => kb.get_battery()?,
+            });
+        }
+        if custom {
             next("per-key colours");
             s.custom = Some(p::colors_from_custom(&kb.get_custom()?));
+        }
+        if macros {
             next("macros");
             s.macros = Some(macros_view(&kb.get_macro_store()?));
         }
         Ok(s)
     })
     .await
+}
+
+/// How the keyboard is connected (opening it if needed, without reading anything).
+#[tauri::command]
+async fn connection_mode(state: tauri::State<'_, AppState>) -> std::result::Result<device::Mode, String> {
+    with_kb(state, |kb| Ok(kb.mode)).await
 }
 
 /// How far `read_all` got: table `step` of `total`, now reading `what`.
@@ -824,7 +859,7 @@ pub fn run() {
             s75::app::s75_get, s75::app::s75_set_lighting, s75::app::s75_set_bar, s75::app::s75_set_settings,
             s75::app::s75_battery, s75::app::s75_set_perkey, s75::app::s75_read_perkey,
             s75::app::s75_set_key, s75::app::s75_set_macros, s75::app::s75_screen_preview,
-            s75::app::s75_upload_screen, s75::app::s75_sync_clock
+            s75::app::s75_upload_screen, s75::app::s75_sync_clock, read_parts, connection_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

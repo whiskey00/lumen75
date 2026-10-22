@@ -411,6 +411,9 @@ export interface S75State {
   catalog: S75Catalog;
 }
 
+/** The tables `readParts` can read. "lighting" also holds the device settings. */
+export type ReadPart = "lighting" | "keymap" | "battery" | "custom" | "macros";
+
 export const api = {
   s75Get: () => invoke<S75State>("s75_get"),
   s75SetLighting: (lighting: S75Lighting) => invoke<S75Saved>("s75_set_lighting", { lighting }),
@@ -455,6 +458,10 @@ export const api = {
   catalog: () => invoke<Catalog>("catalog"),
   status: () => invoke<Status>("status"),
   readAll: () => invoke<Snapshot>("read_all"),
+  /** Read only some tables (over Bluetooth every table is slow). */
+  readParts: (parts: ReadPart[]) => invoke<Snapshot>("read_parts", { parts }),
+  /** How the keyboard is connected, without reading anything. */
+  connectionMode: () => invoke<string>("connection_mode"),
   readBattery: () => invoke<number | null>("read_battery"),
   setEffect: (change: EffectChange) => invoke<Snapshot>("set_effect", { change }),
   resetPalette: (hw: number) => invoke<Snapshot>("reset_palette", { hw }),

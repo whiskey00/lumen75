@@ -22,7 +22,7 @@ the app's header, or leave it on **Auto** (it tries the cable first). Your choic
 | Connection | ID | Notes |
 | --- | --- | --- |
 | 2.4G dongle | `3554:FA09` | The most tested connection. Everything works. |
-| Bluetooth | `3554:FA07` (LE), `3554:FA08` (classic) | Pair **"AULA-F75 5.0"** in Windows Bluetooth settings. Reading the keyboard is slow (about 2 minutes for everything), because many reply packets get lost over Bluetooth. |
+| Bluetooth | `3554:FA07` (LE), `3554:FA08` (classic) | Pair **"AULA-F75 5.0"** in Windows Bluetooth settings. Reading the whole keyboard takes about 2 minutes, because many reply packets get lost over Bluetooth. So Lumen75 opens with what it last read (over any connection) and reads only what the page in front needs; the battery level comes from Windows. |
 | USB cable | `258A:010C` | Uses a different protocol. Lighting, device settings and streamed effects work. The rest isn't worked out yet. |
 
 ## Features

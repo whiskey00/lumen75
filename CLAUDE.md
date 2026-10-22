@@ -69,6 +69,13 @@ work is done here.
     in (stall limit 25, at most 60 attempts), 18 of 18 full reads worked, 4-40 s each. Reading
     everything takes about 2 minutes.
 - Upstream's macOS port gave up on Bluetooth reads; its Linux setup uses LE (FA07).
+- No other F75 project configures over Bluetooth (checked 2026-10-22: aula-f75-linux blocks it,
+  "config traffic breaks typing"; FaizAsta's app only shows the battery). So Lumen75 reads as
+  little as it can (not yet tried over Bluetooth): the frontend keeps the last read board in
+  localStorage (`lumen75.board`); with one remembered, a Bluetooth start opens with it and
+  `read_parts` reads only the page's tables (`PAGE_PARTS` in `App.tsx`) plus the battery, which
+  comes from Windows' own Bluetooth battery level (`win::bluetooth_battery`, DEVPKEY
+  {104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2) before falling back to the vendor read.
 
 ## Wired protocol (found on hardware 2026-10-21)
 
