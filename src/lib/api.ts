@@ -341,7 +341,57 @@ export interface ReadProgress {
   what: string;
 }
 
+export interface S75Lighting {
+  mode: number;
+  rgb: Rgb;
+  colorful: boolean;
+  /** 0-5 */
+  brightness: number;
+  /** 0-5 */
+  speed: number;
+  /** 0 left, 1 right, 2 up, 3 down */
+  direction: number;
+}
+
+export interface S75Settings {
+  win_lock: boolean;
+  alt_f4_lock: boolean;
+  alt_tab_lock: boolean;
+  /** 0 while held, 1 toggle */
+  fn_switch: number;
+  /** 0 never, 1 one minute, 2 five, 3 thirty */
+  sleep: number;
+  /** 1-5 */
+  response: number;
+}
+
+/** What Lumen75 last set on the S75 Pro (it can't be read back). */
+export interface S75Saved {
+  lighting: S75Lighting;
+  bar: number;
+  settings: S75Settings;
+}
+
+export interface S75Catalog {
+  keys: Key[];
+  /** mode, name, controls (1 brightness, 2 speed, 4 left/right, 8 up/down, 0x10 rainbow, 0x20 colour) */
+  effects: [number, string, number][];
+  bar_modes: [number, string][];
+  sleep: [number, string][];
+}
+
+export interface S75State {
+  connection: string | null;
+  saved: S75Saved;
+  catalog: S75Catalog;
+}
+
 export const api = {
+  s75Get: () => invoke<S75State>("s75_get"),
+  s75SetLighting: (lighting: S75Lighting) => invoke<S75Saved>("s75_set_lighting", { lighting }),
+  s75SetBar: (mode: number) => invoke<S75Saved>("s75_set_bar", { mode }),
+  s75SetSettings: (settings: S75Settings) => invoke<S75Saved>("s75_set_settings", { settings }),
+  s75Battery: () => invoke<number | null>("s75_battery"),
   playing: () => invoke<Playing | null>("playing"),
   stopPlaying: () => invoke<Playing | null>("stop_playing"),
   discordGet: () => invoke<DiscordState>("discord_get"),

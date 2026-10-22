@@ -43,6 +43,9 @@ pub struct AppConfig {
     pub discord_auth: crate::discord::Auth,
     /// What Discord lighting shows.
     pub discord_setup: crate::discord::Setup,
+    /// What the app last set on an S75 Pro (it can't be read back from the keyboard).
+    #[cfg(windows)]
+    pub s75: crate::s75::app::Saved,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +97,8 @@ impl Default for AppConfig {
             discord_on: false,
             discord_auth: Default::default(),
             discord_setup: Default::default(),
+            #[cfg(windows)]
+            s75: Default::default(),
         }
     }
 }
@@ -139,7 +144,7 @@ fn save_config(app: &AppHandle, c: &AppConfig) {
     }
 }
 
-fn with_config<T>(app: &AppHandle, f: impl FnOnce(&mut AppConfig) -> T) -> T {
+pub(crate) fn with_config<T>(app: &AppHandle, f: impl FnOnce(&mut AppConfig) -> T) -> T {
     let state = app.state::<AppState>();
     let mut c = state.config.lock().unwrap();
     let r = f(&mut c);

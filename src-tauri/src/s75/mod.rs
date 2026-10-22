@@ -6,3 +6,5 @@ pub mod layout;
 pub mod protocol;
 #[cfg(windows)]
 pub mod winlink;
+#[cfg(windows)]
+pub mod app;

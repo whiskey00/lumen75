@@ -19,6 +19,8 @@ import { AudioPage } from "@/pages/audio";
 import { AnimationsPage } from "@/pages/animations";
 import { GamesPage } from "@/pages/games";
 import { DiscordPage } from "@/pages/discord";
+import { S75LightingPage } from "@/pages/s75-lighting";
+import { S75DevicePage } from "@/pages/s75-device";
 import { friendly } from "@/lib/errors";
 
 type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "device";
@@ -27,6 +29,9 @@ type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord"
  * `board`: the page shows what was read from the keyboard, so it waits for the read. The others
  * (streamed lighting) work at once. `wireless`: not over the USB cable yet.
  */
+/** Pages an S75 Pro has (its own versions); the others need the F75. */
+const S75_PAGES: Page[] = ["lighting", "device"];
+
 const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; board?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun, board: true },
   { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true, board: true },
@@ -167,8 +172,11 @@ export default function App() {
   const supported = status?.devices.find((d) => d.supported && (!wanted || d.mode === wanted));
   const onCable = board?.mode === CABLE;
   // a page the cable can't serve falls back to Lighting
-  const shown: Page = onCable && PAGES.find((p) => p.id === page)?.wireless ? "lighting" : page;
-  const waitsForBoard = !!PAGES.find((p) => p.id === shown)?.board && !board;
+  // an S75 Pro with no F75 around: the app shows the S75 Pro's pages
+  const s75Mode = !!status?.s75 && !(status?.devices ?? []).some((d) => d.supported);
+  const off = (p: Page) => (s75Mode ? !S75_PAGES.includes(p) : onCable && !!PAGES.find((x) => x.id === p)?.wireless);
+  const shown: Page = off(page) ? "lighting" : page;
+  const waitsForBoard = !s75Mode && !!PAGES.find((p) => p.id === shown)?.board && !board;
   const PLAYING_PAGE: Record<Playing["kind"], Page> = { animation: "animations", audio: "audio", league: "games" };
 
   return (
@@ -189,9 +197,11 @@ export default function App() {
               key={p.id}
               variant={page === p.id ? "secondary" : "ghost"}
               className="justify-start"
-              disabled={onCable && p.wireless}
+              disabled={off(p.id)}
               title={
-                onCable && p.wireless
+                s75Mode && off(p.id)
+                  ? "Not on the S75 Pro yet"
+                  : onCable && p.wireless
                   ? "Not available over the USB cable yet"
                   : p.board && !board
                     ? "Opens once the keyboard has been read"
@@ -243,7 +253,11 @@ export default function App() {
                 ))}
               </SelectContent>
             </Select>
-            {board ? (
+            {s75Mode ? (
+              <Badge variant="secondary" className="gap-1.5" title="AULA S75 Pro (support is new and untested)">
+                <span className="size-2 rounded-full bg-amber-500" /> S75 Pro · {status?.s75}
+              </Badge>
+            ) : board ? (
               <Badge variant="secondary" className="gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-500" /> {board.mode}
               </Badge>
@@ -366,7 +380,13 @@ export default function App() {
               </Card>
             )}
 
-            {catalog && (
+            {s75Mode && (
+              <>
+                {shown === "lighting" && <S75LightingPage />}
+                {shown === "device" && <S75DevicePage />}
+              </>
+            )}
+            {!s75Mode && catalog && (
               <>
                 {shown === "animations" && <AnimationsPage catalog={catalog} />}
                 {shown === "audio" && <AudioPage catalog={catalog} />}
@@ -374,7 +394,7 @@ export default function App() {
                 {shown === "discord" && <DiscordPage catalog={catalog} />}
               </>
             )}
-            {board && catalog && (
+            {!s75Mode && board && catalog && (
               <>
                 {shown === "lighting" && <LightingPage board={board} catalog={catalog} busy={busy} run={run} />}
                 {shown === "perkey" && <PerKeyPage board={board} catalog={catalog} busy={busy} run={run} />}

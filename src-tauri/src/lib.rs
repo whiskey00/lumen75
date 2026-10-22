@@ -141,6 +141,9 @@ struct DeviceInfoView {
 #[derive(Default)]
 pub(crate) struct AppState {
     pub(crate) kb: Arc<Mutex<Option<Keyboard>>>,
+    /// An AULA S75 Pro (its own protocol), opened on first use.
+    #[cfg(windows)]
+    pub(crate) s75: Arc<Mutex<Option<s75::device::S75>>>,
     #[cfg(windows)]
     pub(crate) audio: Mutex<Option<audio::run::Handle>>,
     #[cfg(windows)]
@@ -817,7 +820,9 @@ pub fn run() {
             app::perkey_preset_save, app::audio_preset_save, app::preset_delete, app::league_get, app::league_set,
             app::league_preset_save, app::anim_image_import, app::discord_get, app::discord_set,
             app::discord_reconnect, app::playing, app::stop_playing,
-            app::anim_preview, audio_preview
+            app::anim_preview, audio_preview,
+            s75::app::s75_get, s75::app::s75_set_lighting, s75::app::s75_set_bar, s75::app::s75_set_settings,
+            s75::app::s75_battery
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
