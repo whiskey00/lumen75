@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { api, S75Catalog, S75Macro, S75Step } from "@/lib/api";
 import { friendly } from "@/lib/errors";
-import { S75Untested, useS75 } from "@/pages/s75-lighting";
+import { S75Note, useS75 } from "@/pages/s75-lighting";
 
 const MODIFIER_USAGE: Record<string, number> = {
   ctrl: 0xe0, lctrl: 0xe0, shift: 0xe1, lshift: 0xe1, alt: 0xe2, lalt: 0xe2, win: 0xe3, lwin: 0xe3,
@@ -120,7 +120,7 @@ export function S75MacrosPage() {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
+      <S75Note />
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
         <Card className="self-start">
           <CardHeader>

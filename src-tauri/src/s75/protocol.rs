@@ -1,7 +1,7 @@
 //! AULA S75 Pro configuration protocol, written from the description in open-aula's
 //! `web/PROTOCOL.md` (https://github.com/paulcoding810/open-aula, reverse-engineered from the
 //! vendor's DeviceDriver.exe). Only the protocol facts are used; no code is copied.
-//! Not yet tested on an S75 Pro.
+//! Tested on an S75 Pro (2026-10-22): every feature built here works.
 //!
 //! USB (0C45:800A): every command is a 64-byte feature report `04 op b2 0 0 0 0 0 count_lo
 //! count_hi …`, answered by a feature report read back; `count` 64-byte data packets follow,

@@ -8,7 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, S75Settings } from "@/lib/api";
 import { friendly } from "@/lib/errors";
-import { S75Untested, useS75 } from "@/pages/s75-lighting";
+import { S75Note, useS75 } from "@/pages/s75-lighting";
 
 export function S75DevicePage({ children }: { children?: React.ReactNode }) {
   const [state, setState] = useS75();
@@ -34,7 +34,7 @@ export function S75DevicePage({ children }: { children?: React.ReactNode }) {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
+      <S75Note />
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="grid gap-1.5">

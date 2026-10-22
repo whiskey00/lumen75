@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, FlaskConical } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,15 +16,15 @@ import { friendly } from "@/lib/errors";
 /** Control bits of an effect: which settings it uses. */
 const CAP = { brightness: 1, speed: 2, leftRight: 4, upDown: 8, colourful: 0x10, colour: 0x20 };
 
-/** Said once on every S75 Pro page: the support is new and not tried on a keyboard yet. */
-export function S75Untested() {
+/** On the S75 Pro pages whose settings the keyboard can't report back. */
+export function S75Note() {
   return (
     <Alert>
-      <FlaskConical />
-      <AlertTitle>S75 Pro support is new and untested</AlertTitle>
+      <Info />
+      <AlertTitle>Shows what Lumen75 last set</AlertTitle>
       <AlertDescription>
-        It's built from open-aula's protocol notes and hasn't been tried on an S75 Pro yet. The keyboard can't report its
-        settings back, so these pages show what Lumen75 last set.
+        The S75 Pro can't report these settings back, so changes made elsewhere (its own shortcuts or another app) don't show
+        here.
       </AlertDescription>
     </Alert>
   );
@@ -83,7 +83,7 @@ export function S75LightingPage() {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
+      <S75Note />
       <Card>
         <CardHeader>
           <CardTitle>Effect</CardTitle>

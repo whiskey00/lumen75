@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, ImageFit } from "@/lib/api";
 import { friendly } from "@/lib/errors";
-import { S75Untested, useS75 } from "@/pages/s75-lighting";
+import { useS75 } from "@/pages/s75-lighting";
 
 const FITS: { id: ImageFit; label: string }[] = [
   { id: "fill", label: "Fill" },
@@ -75,7 +75,6 @@ export function S75ScreenPage() {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
       <Card>
         <CardHeader>
           <CardTitle>Screen</CardTitle>

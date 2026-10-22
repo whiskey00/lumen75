@@ -10,7 +10,7 @@ import { Keyboard } from "@/components/keyboard";
 import { cn } from "@/lib/utils";
 import { api, fromHex, Rgb, S75Saved, toHex } from "@/lib/api";
 import { friendly } from "@/lib/errors";
-import { S75Untested, useS75 } from "@/pages/s75-lighting";
+import { useS75 } from "@/pages/s75-lighting";
 
 const SWATCHES = ["#ff0000", "#ff6000", "#ffd000", "#00ff40", "#00e5ff", "#0040ff", "#8a00ff", "#ff00b0", "#ffffff"];
 
@@ -59,7 +59,6 @@ export function S75PerKeyPage() {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="grid gap-1.5">

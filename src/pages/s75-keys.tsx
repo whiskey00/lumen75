@@ -10,7 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
 import { Entry, S75Catalog, S75Macro, api } from "@/lib/api";
 import { friendly } from "@/lib/errors";
-import { S75Untested, useS75 } from "@/pages/s75-lighting";
+import { S75Note, useS75 } from "@/pages/s75-lighting";
 
 type Kind = "key" | "media" | "mouse" | "macro" | "disabled";
 
@@ -107,7 +107,7 @@ export function S75KeysPage() {
 
   return (
     <div className="grid gap-4">
-      <S75Untested />
+      <S75Note />
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="grid gap-1.5">

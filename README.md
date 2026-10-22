@@ -62,23 +62,22 @@ Notes:
   can't show cooldowns, because League doesn't share them. It doesn't run over Bluetooth, which
   is too slow for it. After a match it brings back your animation or audio lighting.
 
-## AULA S75 Pro (new, untested)
+## AULA S75 Pro
 
 Lumen75 also supports the **AULA S75 Pro**, built from the protocol notes of
-[open-aula](https://github.com/paulcoding810/open-aula). It hasn't been tried on an S75 Pro
-yet: if you have one, please report what works. When an S75 Pro is connected (and no F75),
-the app switches to its pages.
+[open-aula](https://github.com/paulcoding810/open-aula), and tested on a real S75 Pro: every
+feature below works. When an S75 Pro is connected (and no F75), the app switches to its pages.
 
 | Feature | What it does | USB cable | 2.4G dongle |
 | --- | --- | :-: | :-: |
-| **Lighting effects** | Its 19 effects with colour, rainbow, brightness (0-5), speed (0-5) and direction, plus the side light bar | 🧪 | 🧪 |
-| **Per-key colours** | Paint keys and apply; read the stored colours back | 🧪 | 🧪 (no read-back) |
-| **Key remapping** | Base and Fn layers: keys and combos, media keys, mouse actions, macros, disable | 🧪 | 🧪 |
-| **Macros** | Up to 100, typed one step per line (`ctrl+c`, `wait 100`, `text Hello`, `click left`) | 🧪 | 🧪 |
-| **Screen** | A GIF or picture on its 135 × 240 screen, with a preview | 🧪 | — |
-| **Clock** | Set it to the PC's time | 🧪 | 🧪 |
-| **Settings** | Win, Alt+F4 and Alt+Tab locks, Fn layer mode, sleep, debounce | 🧪 | 🧪 |
-| **Battery** | Shown on the Device page | — | 🧪 |
+| **Lighting effects** | Its 19 effects with colour, rainbow, brightness (0-5), speed (0-5) and direction, plus the side light bar | ✅ | ✅ |
+| **Per-key colours** | Paint keys and apply; read the stored colours back | ✅ | ✅ (no read-back) |
+| **Key remapping** | Base and Fn layers: keys and combos, media keys, mouse actions, macros, disable | ✅ | ✅ |
+| **Macros** | Up to 100, typed one step per line (`ctrl+c`, `wait 100`, `text Hello`, `click left`) | ✅ | ✅ |
+| **Screen** | A GIF or picture on its 135 × 240 screen, with a preview | ✅ | — |
+| **Clock** | Set it to the PC's time | ✅ | ✅ |
+| **Settings** | Win, Alt+F4 and Alt+Tab locks, Fn layer mode, sleep, debounce | ✅ | ✅ |
+| **Battery** | Shown on the Device page | — | ✅ |
 
 Two things differ from the F75:
 
@@ -101,7 +100,7 @@ These are possible with what's known about the keyboard, but not built yet.
 | **More games** | Lighting for CS2 and Dota 2 | Valve's Game State Integration, which works like League's local data |
 | **Status lights** | Light a key for Caps Lock, a muted microphone or a new notification | Reading those states on Windows, on top of other lighting |
 | **Low-battery alert** | A notification before the keyboard runs out | Confirming the battery reading at low charge first |
-| **Other AULA keyboards** | Support for the F87, F99 and others (the S75 Pro is in, untested) | Captures from those keyboards, or notes like open-aula's |
+| **Other AULA keyboards** | Support for the F87, F99 and others (the S75 Pro is in) | Captures from those keyboards, or notes like open-aula's |
 | **Linux and macOS** | Lumen75 on other systems | A HID backend for each. The rest of the app is cross-platform |
 
 Not planned: firmware updates. Flashing the wrong firmware can brick the keyboard.

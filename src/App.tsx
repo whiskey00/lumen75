@@ -259,8 +259,8 @@ export default function App() {
               </SelectContent>
             </Select>
             {s75Mode ? (
-              <Badge variant="secondary" className="gap-1.5" title="AULA S75 Pro (support is new and untested)">
-                <span className="size-2 rounded-full bg-amber-500" /> S75 Pro · {status?.s75}
+              <Badge variant="secondary" className="gap-1.5" title="AULA S75 Pro">
+                <span className="size-2 rounded-full bg-emerald-500" /> S75 Pro · {status?.s75}
               </Badge>
             ) : board ? (
               <Badge variant="secondary" className="gap-1.5">
