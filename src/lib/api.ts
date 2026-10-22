@@ -374,6 +374,23 @@ export interface S75Saved {
   perkey: Rgb[];
   /** 0-5 */
   perkey_brightness: number;
+  /** Remapped keys, base and Fn layer: [key index, entry]. */
+  keymap: [[number, Entry][], [number, Entry][]];
+  macros: S75Macro[];
+}
+
+export type S75Step =
+  | { kind: "key_down"; usage: number }
+  | { kind: "key_up"; usage: number }
+  | { kind: "mouse_down"; button: number }
+  | { kind: "mouse_up"; button: number }
+  | { kind: "delay"; ms: number };
+
+export interface S75Macro {
+  name: string;
+  steps: S75Step[];
+  /** The steps as typed, to edit again. */
+  text: string;
 }
 
 export interface S75Catalog {
@@ -382,6 +399,10 @@ export interface S75Catalog {
   effects: [number, string, number][];
   bar_modes: [number, string][];
   sleep: [number, string][];
+  hid: [string, string, number][];
+  modifiers: [string, string, number][];
+  media: [string, number][];
+  mouse: [string, [number, number]][];
 }
 
 export interface S75State {
@@ -398,6 +419,8 @@ export const api = {
   s75Battery: () => invoke<number | null>("s75_battery"),
   s75SetPerkey: (colors: Rgb[], brightness: number) => invoke<S75Saved>("s75_set_perkey", { colors, brightness }),
   s75ReadPerkey: () => invoke<S75Saved>("s75_read_perkey"),
+  s75SetKey: (layer: number, index: number, entry: Entry | null) => invoke<S75Saved>("s75_set_key", { layer, index, entry }),
+  s75SetMacros: (macros: S75Macro[]) => invoke<S75Saved>("s75_set_macros", { macros }),
   playing: () => invoke<Playing | null>("playing"),
   stopPlaying: () => invoke<Playing | null>("stop_playing"),
   discordGet: () => invoke<DiscordState>("discord_get"),

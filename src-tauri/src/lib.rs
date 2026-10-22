@@ -822,7 +822,8 @@ pub fn run() {
             app::discord_reconnect, app::playing, app::stop_playing,
             app::anim_preview, audio_preview,
             s75::app::s75_get, s75::app::s75_set_lighting, s75::app::s75_set_bar, s75::app::s75_set_settings,
-            s75::app::s75_battery, s75::app::s75_set_perkey, s75::app::s75_read_perkey
+            s75::app::s75_battery, s75::app::s75_set_perkey, s75::app::s75_read_perkey,
+            s75::app::s75_set_key, s75::app::s75_set_macros
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

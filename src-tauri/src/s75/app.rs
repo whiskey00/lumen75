@@ -2,7 +2,7 @@
 //! per-key colours, over USB), so the app keeps what you set in its own settings.
 
 use super::device::S75;
-use super::protocol::{Lighting, Settings, BAR_MODES, EFFECTS};
+use super::protocol::{Entry, Lighting, Settings, Step, BAR_MODES, EFFECTS, MOUSE};
 use crate::keymap::Key;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,20 @@ pub struct Saved {
     pub perkey: Vec<[u8; 3]>,
     /// Brightness of the per-key mode, 0-5.
     pub perkey_brightness: u8,
+    /// Remapped keys of the base and Fn layers: (key index, entry). Keys not listed keep
+    /// their own function.
+    pub keymap: [Vec<(u8, Entry)>; 2],
+    /// Your macros; a macro key plays the one at its position.
+    pub macros: Vec<Macro>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Macro {
+    pub name: String,
+    pub steps: Vec<Step>,
+    /// The steps as you typed them, to show and edit again.
+    #[serde(default)]
+    pub text: String,
 }
 
 impl Default for Saved {
@@ -30,6 +44,8 @@ impl Default for Saved {
             settings: Settings::default(),
             perkey: vec![[0, 0, 0]; 128],
             perkey_brightness: 5,
+            keymap: [Vec::new(), Vec::new()],
+            macros: Vec::new(),
         }
     }
 }
@@ -47,7 +63,31 @@ pub struct Catalog {
     effects: Vec<(u8, &'static str, u8)>,
     bar_modes: Vec<(u8, &'static str)>,
     sleep: Vec<(u8, &'static str)>,
+    /// Keys a key can send: (name, label, HID usage).
+    hid: Vec<(&'static str, &'static str, u8)>,
+    /// (name, label, modifier bit)
+    modifiers: Vec<(&'static str, &'static str, u8)>,
+    /// Media and app keys: (label, consumer usage).
+    media: Vec<(&'static str, u16)>,
+    /// Mouse actions: (label, the entry's two bytes after its type).
+    mouse: Vec<(&'static str, [u8; 2])>,
 }
+
+/// Consumer-control usages (USB HID usage tables, page 0x0C).
+const MEDIA: [(&str, u16); 12] = [
+    ("Play / pause", 0xcd),
+    ("Stop", 0xb7),
+    ("Previous track", 0xb6),
+    ("Next track", 0xb5),
+    ("Mute", 0xe2),
+    ("Volume up", 0xe9),
+    ("Volume down", 0xea),
+    ("Calculator", 0x192),
+    ("Mail", 0x18a),
+    ("Browser home", 0x223),
+    ("Search", 0x221),
+    ("This PC", 0x194),
+];
 
 #[derive(Serialize)]
 pub struct State {
@@ -63,6 +103,10 @@ fn catalog() -> Catalog {
         effects: EFFECTS.to_vec(),
         bar_modes: BAR_MODES.to_vec(),
         sleep: vec![(0, "Never"), (1, "1 minute"), (2, "5 minutes"), (3, "30 minutes")],
+        hid: crate::keymap::HID.to_vec(),
+        modifiers: crate::keymap::MODIFIERS.to_vec(),
+        media: MEDIA.to_vec(),
+        mouse: MOUSE.to_vec(),
     }
 }
 
@@ -161,6 +205,36 @@ pub async fn s75_read_perkey(app: AppHandle) -> Result<Saved, String> {
             slots[i as usize] = rgb;
         }
         c.s75.perkey = slots;
+        c.s75.clone()
+    }))
+}
+
+/// Remap one key on a layer (0 base, 1 Fn), or give it back its own function (`entry` None).
+/// The keyboard takes a whole layer at a time, so the layer's other remaps go with it.
+#[tauri::command]
+pub async fn s75_set_key(app: AppHandle, layer: u8, index: u8, entry: Option<Entry>) -> Result<Saved, String> {
+    let l = (layer as usize).min(1);
+    let mut map = saved(&app).keymap[l].clone();
+    map.retain(|(i, _)| *i != index);
+    if let Some(e) = entry {
+        map.push((index, e));
+    }
+    map.sort_by_key(|(i, _)| *i);
+    let send = map.clone();
+    with_s75(&app, move |kb| kb.set_keymap(l == 1, &send)).await?;
+    Ok(crate::app::with_config(&app, |c| {
+        c.s75.keymap[l] = map;
+        c.s75.clone()
+    }))
+}
+
+/// Every macro at once (the keyboard stores them as one block).
+#[tauri::command]
+pub async fn s75_set_macros(app: AppHandle, macros: Vec<Macro>) -> Result<Saved, String> {
+    let steps: Vec<Vec<Step>> = macros.iter().map(|m| m.steps.clone()).collect();
+    with_s75(&app, move |kb| kb.set_macros(&steps)).await?;
+    Ok(crate::app::with_config(&app, |c| {
+        c.s75.macros = macros;
         c.s75.clone()
     }))
 }
