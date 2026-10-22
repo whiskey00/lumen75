@@ -38,6 +38,25 @@ pub enum Kind {
     Aurora,
     /// A bright comet with a fading tail races around the edge of the board.
     Comet,
+    /// Your own: frames you paint, each held and then faded into the next (see `Frame`).
+    Custom,
+}
+
+/// One frame of your own animation: every key's colour, how long it shows, and how long it
+/// takes to fade into the next frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Frame {
+    /// By matrix index (126; unused indexes stay black).
+    pub colors: Vec<Rgb>,
+    pub hold_ms: u32,
+    pub fade_ms: u32,
+}
+
+impl Default for Frame {
+    fn default() -> Self {
+        Frame { colors: vec![[0, 0, 0]; 126], hold_ms: 500, fade_ms: 300 }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +83,8 @@ pub struct Settings {
     pub image: Option<String>,
     /// For Image: how the picture is laid over the board.
     pub fit: crate::imagelight::Fit,
+    /// For Custom: your frames, played in order and looped.
+    pub frames: Vec<Frame>,
 }
 
 impl Default for Settings {
@@ -76,8 +97,31 @@ impl Default for Settings {
             direction: Direction::Right,
             image: None,
             fit: crate::imagelight::Fit::Fill,
+            frames: Vec::new(),
         }
     }
+}
+
+/// Your own animation at time `t`: which frame shows, and how far it has faded into the
+/// next. Each key's colour, by matrix index.
+fn custom_colors(frames: &[Frame], t: f32) -> Option<Vec<Rgb>> {
+    let len = |f: &Frame| (f.hold_ms + f.fade_ms).max(1) as f32 / 1000.0;
+    let total: f32 = frames.iter().map(len).sum();
+    if frames.is_empty() || total <= 0.0 {
+        return None;
+    }
+    let mut left = t.rem_euclid(total);
+    for (i, f) in frames.iter().enumerate() {
+        if left < len(f) {
+            let hold = f.hold_ms as f32 / 1000.0;
+            let next = &frames[(i + 1) % frames.len()];
+            let k = if left <= hold { 0.0 } else { (left - hold) / (f.fade_ms.max(1) as f32 / 1000.0) };
+            let at = |c: &Vec<Rgb>, i: usize| c.get(i).copied().unwrap_or([0, 0, 0]);
+            return Some((0..126).map(|i| mix(at(&f.colors, i), at(&next.colors, i), k)).collect());
+        }
+        left -= len(f);
+    }
+    None
 }
 
 /// Ready-made animations to start from, offered next to your own presets.
@@ -259,6 +303,15 @@ pub fn render(leds: &[Led], s: &Settings, t: f32) -> Vec<(Rgb, Vec<u8>)> {
             bands.insert(0, (c, leds.iter().map(|l| l.index).collect()));
         }
         Kind::Image => {} // drawn by render_image, from the decoded picture
+        Kind::Custom => {
+            if let Some(cs) = custom_colors(&s.frames, t) {
+                for l in leds {
+                    let c = scale(cs[l.index as usize], bright);
+                    // one group per colour (merged further on 2.4G and Bluetooth if needed)
+                    bands.entry(3000 + (c[0] as usize) * 65536 + (c[1] as usize) * 256 + c[2] as usize).or_insert((c, Vec::new())).1.push(l.index);
+                }
+            }
+        }
         Kind::Ripple => {
             // a drop every 0.7 s, at a key picked by its number, each ring living 1.6 s
             let (every, life) = (0.7, 1.6);
@@ -630,6 +683,24 @@ mod tests {
                 .sum()
         };
         assert!(total(5) > total(0));
+    }
+
+    #[test]
+    fn your_frames_hold_then_fade_into_the_next() {
+        let leds = leds();
+        let q = crate::keymap::key_by_name("q").unwrap().index as usize;
+        let mut red = Frame { hold_ms: 1000, fade_ms: 1000, ..Frame::default() };
+        red.colors[q] = [200, 0, 0];
+        let mut blue = Frame { hold_ms: 1000, fade_ms: 0, ..Frame::default() };
+        blue.colors[q] = [0, 0, 200];
+        let s = Settings { kind: Kind::Custom, frames: vec![red, blue], ..Settings::default() };
+        let colour = |t: f32| render(&leds, &s, t).into_iter().find(|(_, ks)| ks.contains(&(q as u8))).map(|g| g.0);
+        assert_eq!(colour(0.5), Some([200, 0, 0])); // holding
+        assert_eq!(colour(1.5), Some([100, 0, 100])); // half way through the fade
+        assert_eq!(colour(2.5), Some([0, 0, 200])); // the next frame
+        assert_eq!(colour(3.5), Some([200, 0, 0])); // looped (blue has no fade)
+        // nothing to show without frames
+        assert!(render(&leds, &Settings { kind: Kind::Custom, ..Settings::default() }, 1.0).is_empty());
     }
 
     #[test]

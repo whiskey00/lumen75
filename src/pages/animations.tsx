@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Keyboard } from "@/components/keyboard";
 import { MiniKeyboard } from "@/components/mini-keyboard";
+import { blankFrame, FrameEditor } from "@/components/frame-editor";
 import { PresetBar } from "@/components/preset-bar";
 import { ColourList, ColourPresets, MAX_COLOURS } from "@/components/colour-list";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const KINDS: { id: AnimKind; label: string; help: string; soon?: boolean }[] = [
   { id: "aurora", label: "Aurora", help: "Slow curtains of light drift across the board" },
   { id: "ripple", label: "Ripple", help: "Drops land on keys and send rings outwards" },
   { id: "comet", label: "Comet", help: "A comet with a fading tail races around the edge" },
+  { id: "custom", label: "Your own", help: "Frames you paint, each fading into the next" },
   { id: "image", label: "Image", help: "Plays a GIF or picture on the keys" },
 ];
 
@@ -143,6 +145,16 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
   const preview = previews[KINDS.findIndex((k) => k.id === s.kind)] ?? [];
   const colours = new Map<number, Rgb>(state.running ? (frame?.keys ?? []) : preview);
   const isImage = s.kind === "image";
+  const isCustom = s.kind === "custom";
+
+  /** Choosing an animation; your own starts with two frames in your first two colours. */
+  const choose = (kind: AnimKind) => {
+    if (kind === "fire" && s.kind !== "fire") return set({ kind, direction: "up" });
+    if (kind === "custom" && s.frames.length === 0) {
+      return set({ kind, frames: [blankFrame(s.colors[0] ?? [255, 0, 0]), blankFrame(s.colors[1] ?? [0, 0, 0])] });
+    }
+    set({ kind });
+  };
   const usesDirection = ["stream", "wave", "gradient", "fire", "aurora"].includes(s.kind);
 
   return (
@@ -154,7 +166,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
             type="button"
             disabled={k.soon}
             title={k.help}
-            onClick={() => set(k.id === "fire" && s.kind !== "fire" ? { kind: k.id, direction: "up" } : { kind: k.id })}
+            onClick={() => choose(k.id)}
             className={cn(
               "bg-card hover:border-primary/50 grid gap-1.5 rounded-lg border p-2 text-left transition-colors disabled:opacity-50",
               s.kind === k.id && "border-primary ring-primary/30 ring-2",
@@ -211,7 +223,15 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
         </Card>
 
         <Card>
-          {isImage ? (
+          {isCustom ? (
+            <CardHeader>
+              <CardTitle className="text-base">Your frames</CardTitle>
+              <CardDescription>
+                Paint each frame, set how long it shows and how long it fades into the next. The preview above plays it; Speed
+                makes the whole loop faster or slower. Up to 60 frames.
+              </CardDescription>
+            </CardHeader>
+          ) : isImage ? (
             <CardHeader>
               <CardTitle className="text-base">Picture</CardTitle>
               <CardDescription>
@@ -226,7 +246,9 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
             </CardHeader>
           )}
           <CardContent className="grid gap-4">
-            {isImage ? (
+            {isCustom ? (
+              <FrameEditor catalog={catalog} frames={s.frames} onChange={(frames) => set({ frames })} />
+            ) : isImage ? (
               <>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button variant="outline" onClick={chooseImage} disabled={importing}>
@@ -268,7 +290,7 @@ export function AnimationsPage({ catalog }: { catalog: Catalog }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground text-sm">Ready-made:</span>
               {ready.map((p) => (
-                <Button key={p.name} size="sm" variant="outline" className="gap-2" onClick={() => set({ ...p.settings, image: s.image, fit: s.fit })}>
+                <Button key={p.name} size="sm" variant="outline" className="gap-2" onClick={() => set({ ...p.settings, image: s.image, fit: s.fit, frames: s.frames })}>
                   <span className="flex">
                     {p.settings.colors.slice(0, 3).map((c, i) => (
                       <span key={i} className="-ml-1 size-3 rounded-full border border-black/40 first:ml-0" style={{ background: toHex(c) }} />

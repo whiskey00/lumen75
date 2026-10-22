@@ -321,6 +321,7 @@ fn playing_now(app: &AppHandle) -> Option<Playing> {
             anim::Kind::Ripple => "Ripple",
             anim::Kind::Aurora => "Aurora",
             anim::Kind::Comet => "Comet",
+            anim::Kind::Custom => "Custom",
             anim::Kind::Image => "Image",
         };
         return Some(Playing { kind: "animation", label: format!("{name} animation") });

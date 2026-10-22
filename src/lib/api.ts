@@ -157,7 +157,14 @@ export interface AudioFrame {
   device: string;
 }
 
-export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "fire" | "ripple" | "aurora" | "comet" | "image";
+export type AnimKind = "stream" | "breathing" | "wave" | "sparkle" | "gradient" | "fire" | "ripple" | "aurora" | "comet" | "custom" | "image";
+
+/** A frame of your own animation: every key's colour (by matrix index), shown and then faded. */
+export interface CustomFrame {
+  colors: Rgb[];
+  hold_ms: number;
+  fade_ms: number;
+}
 /** How a picture is laid over the board. */
 export type ImageFit = "fill" | "fit" | "stretch";
 export type AnimDirection = "right" | "left" | "up" | "down";
@@ -174,6 +181,8 @@ export interface AnimSettings {
   /** For "image": the app's copy of the picture. */
   image: string | null;
   fit: ImageFit;
+  /** For "custom": your frames, played in order and looped. */
+  frames: CustomFrame[];
 }
 
 export interface ImageInfo {
