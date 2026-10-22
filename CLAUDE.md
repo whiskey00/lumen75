@@ -31,6 +31,15 @@ work is done here.
   thread), handover in `app.rs`, page `src/pages/games.tsx`. Design and plan in
   `docs/superpowers/`. Debug builds print each kill event's names (`[league] kill: ...`) to check
   Riot ID matching.
+- **AULA S75 Pro: built, never tested on hardware** (no S75 Pro here). Code in `src-tauri/src/s75/`
+  (protocol, layout, device sequences, Windows link, screen, app commands) and
+  `src/pages/s75-*.tsx`. Protocol facts from open-aula's `web/PROTOCOL.md` (no licence: never copy
+  its code). USB 0C45:800A (64-byte feature reports, no report ID; screen = output report
+  > 4096), dongle 05AC:024F MI_03 (32-byte reports). The app switches to S75 pages when an S75
+  Pro is connected and no F75. Its settings can't be read back (per-key colours over USB only),
+  so `AppConfig.s75` keeps what the app set. No live colour command known (`04 20` "music mode"
+  unported), so no animations/audio/games/Discord on it. First things to check on a real one:
+  detection (`s75::winlink::find`), a lighting write, then the per-key read-back.
 - Battery reading is experimental (first byte of the 0x4A reply).
 - No git remote yet: the owner will add a GitHub repo and push.
 

@@ -50,6 +50,16 @@ The wired real-time frame header (`wired_live_frame` in `protocol.rs`) matches w
 project sends, and its notes on which effect numbers are safe over the cable were followed.
 No code is copied from it.
 
+## open-aula (protocol reference only, S75 Pro)
+
+<https://github.com/paulcoding810/open-aula>
+
+The S75 Pro support in `src-tauri/src/s75/` follows the protocol open-aula describes in its
+`web/PROTOCOL.md` and model files: command bytes, data layouts, the dongle's frame format, the
+screen image format and the keys' table indexes. Those are protocol facts. open-aula has no
+licence, so none of its code or images is copied; the implementation and the keyboard drawing
+are our own.
+
 ## Riot Games (League lighting)
 
 The League lighting reads Riot's Live Client Data API, which League of Legends serves on your
