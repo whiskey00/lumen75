@@ -101,6 +101,8 @@ export interface Status {
   devices: { mode: string; supported: boolean; name: string }[];
   vendor_app_running: boolean;
   connected: boolean;
+  /** An AULA S75 Pro, by how it's connected; null when none is there. */
+  s75: string | null;
 }
 
 export interface EffectChange {

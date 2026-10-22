@@ -11,6 +11,7 @@ pub mod league;
 pub mod macros;
 pub mod match_watch;
 pub mod protocol;
+pub mod s75;
 #[cfg(windows)]
 pub mod win;
 
@@ -124,6 +125,8 @@ struct Status {
     devices: Vec<DeviceInfoView>,
     vendor_app_running: bool,
     connected: bool,
+    /// An S75 Pro: how it's connected ("USB cable" / "2.4G dongle"), if one is there.
+    s75: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -238,7 +241,18 @@ async fn status(state: tauri::State<'_, AppState>) -> std::result::Result<Status
         );
         #[cfg(not(windows))]
         let (devices, vendor): (Vec<DeviceInfoView>, bool) = (vec![], false);
-        Status { devices, vendor_app_running: vendor, connected }
+        #[cfg(windows)]
+        let s75 = {
+            let f = s75::winlink::find();
+            if f.usb.is_some() {
+                Some("USB cable".to_string())
+            } else {
+                f.dongle.map(|_| "2.4G dongle".to_string())
+            }
+        };
+        #[cfg(not(windows))]
+        let s75 = None;
+        Status { devices, vendor_app_running: vendor, connected, s75 }
     })
     .await
     .map_err(|e| e.to_string())

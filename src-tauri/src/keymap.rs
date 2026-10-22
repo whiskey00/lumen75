@@ -22,7 +22,7 @@ const ORIGIN: u16 = 30;
 const U: u16 = 37;
 
 /// A key at column `col` and width `w` (both in quarter u) on row `row` (0 = function row).
-const fn k(index: u8, name: &'static str, label: &'static str, col: u16, row: u16, w: u16) -> Key {
+pub(crate) const fn k(index: u8, name: &'static str, label: &'static str, col: u16, row: u16, w: u16) -> Key {
     let x = ORIGIN + col * U / 4;
     let y = ORIGIN + if row == 0 { 0 } else { (5 + 4 * (row - 1)) * U / 4 };
     let x2 = ORIGIN + (col + w) * U / 4;

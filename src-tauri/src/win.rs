@@ -56,7 +56,7 @@ pub struct DeviceInfo {
 }
 
 /// Device paths of every HID collection present.
-fn interface_paths() -> Vec<String> {
+pub(crate) fn interface_paths() -> Vec<String> {
     let mut out = Vec::new();
     unsafe {
         let mut guid: GUID = zeroed();
@@ -93,7 +93,7 @@ fn interface_paths() -> Vec<String> {
     out
 }
 
-fn open(path: &str, access: u32, flags: u32) -> Option<HANDLE> {
+pub(crate) fn open(path: &str, access: u32, flags: u32) -> Option<HANDLE> {
     let wide: Vec<u16> = path.encode_utf16().chain(Some(0)).collect();
     let h = unsafe {
         CreateFileW(wide.as_ptr(), access, FILE_SHARE_READ | FILE_SHARE_WRITE, std::ptr::null(), OPEN_EXISTING, flags, std::ptr::null_mut())
@@ -101,7 +101,7 @@ fn open(path: &str, access: u32, flags: u32) -> Option<HANDLE> {
     (!bad(h)).then_some(h)
 }
 
-fn caps(h: HANDLE) -> Option<HIDP_CAPS> {
+pub(crate) fn caps(h: HANDLE) -> Option<HIDP_CAPS> {
     unsafe {
         let mut pp = zeroed();
         if HidD_GetPreparsedData(h, &mut pp) == 0 {
@@ -209,17 +209,11 @@ impl WinChannel {
         }
     }
 
-    fn last_error(what: &str) -> DeviceError {
-        DeviceError(format!("{what} (Windows error {})", unsafe { GetLastError() }))
-    }
-}
-
-impl Channel for WinChannel {
-    fn write(&mut self, pkt: &Packet) -> Result<()> {
-        // Windows wants exactly the collection's output report length
-        let mut data = vec![0u8; self.out_len.max(PACKET_LEN)];
-        data[..PACKET_LEN].copy_from_slice(pkt);
-        data.truncate(self.out_len);
+    /// Write one output report: `data` starts with the report ID and is padded or cut to the
+    /// collection's output report length, as Windows wants exactly that.
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<()> {
+        let mut data = data.to_vec();
+        data.resize(self.out_len.max(1), 0);
         unsafe {
             ResetEvent(self.wr_ev);
             let mut ov: OVERLAPPED = zeroed();
@@ -243,6 +237,16 @@ impl Channel for WinChannel {
             }
         }
         Ok(())
+    }
+
+    fn last_error(what: &str) -> DeviceError {
+        DeviceError(format!("{what} (Windows error {})", unsafe { GetLastError() }))
+    }
+}
+
+impl Channel for WinChannel {
+    fn write(&mut self, pkt: &Packet) -> Result<()> {
+        self.write_bytes(pkt)
     }
 
     fn recv(&mut self, timeout: Duration) -> Result<Option<Vec<u8>>> {
