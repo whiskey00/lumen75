@@ -370,6 +370,10 @@ export interface S75Saved {
   lighting: S75Lighting;
   bar: number;
   settings: S75Settings;
+  /** Per-key colours by key index (128 slots). */
+  perkey: Rgb[];
+  /** 0-5 */
+  perkey_brightness: number;
 }
 
 export interface S75Catalog {
@@ -392,6 +396,8 @@ export const api = {
   s75SetBar: (mode: number) => invoke<S75Saved>("s75_set_bar", { mode }),
   s75SetSettings: (settings: S75Settings) => invoke<S75Saved>("s75_set_settings", { settings }),
   s75Battery: () => invoke<number | null>("s75_battery"),
+  s75SetPerkey: (colors: Rgb[], brightness: number) => invoke<S75Saved>("s75_set_perkey", { colors, brightness }),
+  s75ReadPerkey: () => invoke<S75Saved>("s75_read_perkey"),
   playing: () => invoke<Playing | null>("playing"),
   stopPlaying: () => invoke<Playing | null>("stop_playing"),
   discordGet: () => invoke<DiscordState>("discord_get"),

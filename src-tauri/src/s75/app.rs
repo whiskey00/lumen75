@@ -16,12 +16,27 @@ pub struct Saved {
     /// The side light bar's mode (see `BAR_MODES`).
     pub bar: u8,
     pub settings: Settings,
+    /// Per-key colours by key index (128 slots; unused ones stay black).
+    pub perkey: Vec<[u8; 3]>,
+    /// Brightness of the per-key mode, 0-5.
+    pub perkey_brightness: u8,
 }
 
 impl Default for Saved {
     fn default() -> Self {
-        Saved { lighting: Lighting::default(), bar: 0x20, settings: Settings::default() }
+        Saved {
+            lighting: Lighting::default(),
+            bar: 0x20,
+            settings: Settings::default(),
+            perkey: vec![[0, 0, 0]; 128],
+            perkey_brightness: 5,
+        }
     }
+}
+
+/// The colours of the S75 Pro's keys, from a 128-slot list.
+fn key_colors(slots: &[[u8; 3]]) -> Vec<(u8, [u8; 3])> {
+    super::layout::KEYS.iter().map(|k| (k.index, slots.get(k.index as usize).copied().unwrap_or([0, 0, 0]))).collect()
 }
 
 #[derive(Serialize)]
@@ -117,6 +132,35 @@ pub async fn s75_set_settings(app: AppHandle, settings: Settings) -> Result<Save
     with_s75(&app, move |kb| kb.set_settings(&settings)).await?;
     Ok(crate::app::with_config(&app, |c| {
         c.s75.settings = settings;
+        c.s75.clone()
+    }))
+}
+
+/// Per-key colours (128 slots by key index): switches the keyboard to its per-key mode.
+#[tauri::command]
+pub async fn s75_set_perkey(app: AppHandle, colors: Vec<[u8; 3]>, brightness: u8) -> Result<Saved, String> {
+    let keys = key_colors(&colors);
+    let b = brightness.min(5);
+    with_s75(&app, move |kb| kb.set_perkey(&keys, b)).await?;
+    Ok(crate::app::with_config(&app, |c| {
+        c.s75.perkey = colors;
+        c.s75.perkey_brightness = b;
+        c.s75.lighting.mode = super::protocol::USER_LIGHT_MODE;
+        c.s75.clone()
+    }))
+}
+
+/// The per-key colours stored on the keyboard (USB only), saved as the app's copy too.
+#[tauri::command]
+pub async fn s75_read_perkey(app: AppHandle) -> Result<Saved, String> {
+    let indexes: Vec<u8> = super::layout::KEYS.iter().map(|k| k.index).collect();
+    let read = with_s75(&app, move |kb| kb.read_perkey(&indexes)).await?;
+    Ok(crate::app::with_config(&app, |c| {
+        let mut slots = vec![[0u8; 3]; 128];
+        for (i, rgb) in read {
+            slots[i as usize] = rgb;
+        }
+        c.s75.perkey = slots;
         c.s75.clone()
     }))
 }

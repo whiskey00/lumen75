@@ -21,6 +21,7 @@ import { GamesPage } from "@/pages/games";
 import { DiscordPage } from "@/pages/discord";
 import { S75LightingPage } from "@/pages/s75-lighting";
 import { S75DevicePage } from "@/pages/s75-device";
+import { S75PerKeyPage } from "@/pages/s75-perkey";
 import { friendly } from "@/lib/errors";
 
 type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "device";
@@ -30,7 +31,7 @@ type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord"
  * (streamed lighting) work at once. `wireless`: not over the USB cable yet.
  */
 /** Pages an S75 Pro has (its own versions); the others need the F75. */
-const S75_PAGES: Page[] = ["lighting", "device"];
+const S75_PAGES: Page[] = ["lighting", "perkey", "device"];
 
 const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; board?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun, board: true },
@@ -383,6 +384,7 @@ export default function App() {
             {s75Mode && (
               <>
                 {shown === "lighting" && <S75LightingPage />}
+                {shown === "perkey" && <S75PerKeyPage />}
                 {shown === "device" && <S75DevicePage />}
               </>
             )}
