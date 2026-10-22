@@ -4,6 +4,7 @@
 pub mod device;
 pub mod layout;
 pub mod protocol;
+pub mod screen;
 #[cfg(windows)]
 pub mod winlink;
 #[cfg(windows)]

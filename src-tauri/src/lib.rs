@@ -823,7 +823,8 @@ pub fn run() {
             app::anim_preview, audio_preview,
             s75::app::s75_get, s75::app::s75_set_lighting, s75::app::s75_set_bar, s75::app::s75_set_settings,
             s75::app::s75_battery, s75::app::s75_set_perkey, s75::app::s75_read_perkey,
-            s75::app::s75_set_key, s75::app::s75_set_macros
+            s75::app::s75_set_key, s75::app::s75_set_macros, s75::app::s75_screen_preview,
+            s75::app::s75_upload_screen, s75::app::s75_sync_clock
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

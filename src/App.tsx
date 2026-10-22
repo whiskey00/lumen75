@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
-import { AudioLines, BatteryFull, Gamepad2, Headphones, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Square, Sun, TriangleAlert } from "lucide-react";
+import { AudioLines, BatteryFull, Gamepad2, Headphones, Monitor, Sparkles, BatteryLow, BatteryMedium, Grid3x3, Keyboard as KeyboardIcon, Loader2, RefreshCw, Settings2, SquareFunction, Square, Sun, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,18 +24,19 @@ import { S75DevicePage } from "@/pages/s75-device";
 import { S75PerKeyPage } from "@/pages/s75-perkey";
 import { S75KeysPage } from "@/pages/s75-keys";
 import { S75MacrosPage } from "@/pages/s75-macros";
+import { S75ScreenPage } from "@/pages/s75-screen";
 import { friendly } from "@/lib/errors";
 
-type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "device";
+type Page = "lighting" | "perkey" | "animations" | "audio" | "games" | "discord" | "keys" | "macros" | "screen" | "device";
 
 /**
  * `board`: the page shows what was read from the keyboard, so it waits for the read. The others
  * (streamed lighting) work at once. `wireless`: not over the USB cable yet.
  */
 /** Pages an S75 Pro has (its own versions); the others need the F75. */
-const S75_PAGES: Page[] = ["lighting", "perkey", "keys", "macros", "device"];
+const S75_PAGES: Page[] = ["lighting", "perkey", "keys", "macros", "screen", "device"];
 
-const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; board?: boolean }[] = [
+const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; board?: boolean; s75only?: boolean }[] = [
   { id: "lighting", label: "Lighting", icon: Sun, board: true },
   { id: "perkey", label: "Per-key", icon: Grid3x3, wireless: true, board: true },
   { id: "animations", label: "Animations", icon: Sparkles },
@@ -45,6 +46,7 @@ const PAGES: { id: Page; label: string; icon: typeof Sun; wireless?: boolean; bo
   // over the cable the macros aren't read (the page needs them) and key writes don't work yet
   { id: "keys", label: "Keys", icon: KeyboardIcon, wireless: true, board: true },
   { id: "macros", label: "Macros", icon: SquareFunction, wireless: true, board: true },
+  { id: "screen", label: "Screen", icon: Monitor, s75only: true },
   { id: "device", label: "Device", icon: Settings2, board: true },
 ];
 
@@ -195,7 +197,7 @@ export default function App() {
           </div>
         </div>
         <nav className="grid gap-1 px-3">
-          {PAGES.map((p) => (
+          {PAGES.filter((p) => s75Mode || !p.s75only).map((p) => (
             <Button
               key={p.id}
               variant={page === p.id ? "secondary" : "ghost"}
@@ -389,6 +391,7 @@ export default function App() {
                 {shown === "perkey" && <S75PerKeyPage />}
                 {shown === "keys" && <S75KeysPage />}
                 {shown === "macros" && <S75MacrosPage />}
+                {shown === "screen" && <S75ScreenPage />}
                 {shown === "device" && <S75DevicePage />}
               </>
             )}

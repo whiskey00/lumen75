@@ -6,7 +6,7 @@ use super::protocol::{Entry, Lighting, Settings, Step, BAR_MODES, EFFECTS, MOUSE
 use crate::keymap::Key;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// What the app last set on the S75 Pro (saved with the app's settings).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -237,6 +237,55 @@ pub async fn s75_set_macros(app: AppHandle, macros: Vec<Macro>) -> Result<Saved,
         c.s75.macros = macros;
         c.s75.clone()
     }))
+}
+
+/// The first frame of a picture as the screen would show it, as a data: URL.
+#[tauri::command]
+pub async fn s75_screen_preview(path: String, fit: crate::imagelight::Fit) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let png = super::screen::preview_png(std::path::Path::new(&path), fit)?;
+        Ok(format!("data:image/png;base64,{}", super::screen::base64(&png)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Put a GIF or picture on the screen (USB only). Progress arrives as "s75-screen-progress"
+/// (0..1). Returns how many frames went up.
+#[tauri::command]
+pub async fn s75_upload_screen(app: AppHandle, path: String, fit: crate::imagelight::Fit) -> Result<usize, String> {
+    let (image, frames) = tauri::async_runtime::spawn_blocking(move || super::screen::image(std::path::Path::new(&path), fit))
+        .await
+        .map_err(|e| e.to_string())??;
+    let a = app.clone();
+    with_s75(&app, move |kb| {
+        kb.upload_screen(&image, 1, |done| {
+            let _ = a.emit("s75-screen-progress", done);
+        })
+    })
+    .await?;
+    Ok(frames)
+}
+
+/// Set the keyboard's clock to this PC's time.
+#[tauri::command]
+pub async fn s75_sync_clock(app: AppHandle) -> Result<(), String> {
+    use windows_sys::Win32::System::SystemInformation::GetLocalTime;
+    let st = unsafe {
+        let mut st = std::mem::zeroed();
+        GetLocalTime(&mut st);
+        st
+    };
+    let t = super::protocol::Time {
+        year: st.wYear,
+        month: st.wMonth as u8,
+        day: st.wDay as u8,
+        hour: st.wHour as u8,
+        minute: st.wMinute as u8,
+        second: st.wSecond as u8,
+        weekday: st.wDayOfWeek as u8,
+    };
+    with_s75(&app, move |kb| kb.set_time(&t)).await
 }
 
 /// Battery percentage over the dongle (None on the cable).
