@@ -1,51 +1,109 @@
 <p align="center">
-  <img src="app-icon.svg" alt="Lumen75 logo" width="128" height="128">
+  <img src="app-icon.svg" alt="Lumen75 logo" width="112" height="112">
 </p>
 
 <h1 align="center">Lumen75</h1>
 
-An unofficial desktop app for the **AULA F75** keyboard. You can use it instead of the official
-software for lighting, per-key colours, key remapping, macros and device settings. It adds a
-few things the official app can't do: animations in your own colours, lighting that follows your
-music, and lighting that reacts to League of Legends matches.
+<p align="center">
+  <b>An open-source desktop app for the AULA F75 and S75 Pro keyboards.</b><br>
+  Lighting, per-key colours, key remapping, macros and device settings,
+  plus animations in your own colours, music-reactive lighting and League of Legends lighting.
+</p>
 
-Windows only for now. Built with Tauri 2, Rust, React, TypeScript and shadcn/ui.
+<p align="center">
+  <img alt="Platform: Windows" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6?logo=windows&logoColor=white">
+  <img alt="Built with Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-backend-000000?logo=rust&logoColor=white">
+  <img alt="React and TypeScript" src="https://img.shields.io/badge/React%20%2B%20TypeScript-frontend-3178C6?logo=typescript&logoColor=white">
+  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-green"></a>
+</p>
 
-> Close the official AULA app before using Lumen75. Both talk to the keyboard over the same
-> channel, and Lumen75 warns you when the official app is running.
+<p align="center">
+  <a href="#highlights">Highlights</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="#supported-keyboards">Supported keyboards</a> ·
+  <a href="#roadmap">Roadmap</a> ·
+  <a href="#development">Development</a>
+</p>
 
-## Connections
+<p align="center">
+  <img src="docs/screenshots/per-key.png" alt="Lumen75 per-key colour editor" width="820">
+</p>
 
-The F75 has a switch on the back for three connections. Lumen75 supports all three. Pick one in
-the app's header, or leave it on **Auto** (it tries the cable first). Your choice is saved.
+> [!IMPORTANT]
+> Lumen75 is an unofficial, independent project. It isn't affiliated with or endorsed by AULA.
+> Close the official AULA app before you use it: both apps talk to the keyboard over the same
+> channel. Lumen75 warns you when the official app is running.
 
-| Connection | ID | Notes |
+## Highlights
+
+- **Everything the official app does.** The 16 built-in effects, custom colours, per-key
+  colours, key remapping on both layers, on-board macros and device settings.
+- **Animations in your own colours.** Stream, Breathing, Wave, Sparkle, Gradient and more,
+  with 1 to 7 colours of your choice. The keyboard's own effects only use a fixed rainbow.
+- **Lighting that follows your music.** Spectrum, Mirror, Ripple and Pulse react to whatever
+  your PC plays. No microphone needed.
+- **League of Legends lighting.** Health, mana and gold bars, a dead state, and effects for
+  kills, objectives and the match result, from the data League shares on your PC.
+- **All three connections.** USB cable, 2.4G dongle and Bluetooth, picked for you on start.
+- **Lives in the tray.** Starts hidden with Windows and resumes your last animation.
+- **Safe to try.** Back up the whole keyboard to hex files and restore it in one click.
+  Every key remap is read back and checked.
+
+## Screenshots
+
+| Lighting | Animations |
+| :-: | :-: |
+| <img src="docs/screenshots/lighting.png" alt="Lighting page" width="400"> | <img src="docs/screenshots/animations.png" alt="Animations page" width="400"> |
+| **Keys** | **Device** |
+| <img src="docs/screenshots/keys.png" alt="Key remapping page" width="400"> | <img src="docs/screenshots/device.png" alt="Device settings page" width="400"> |
+
+## Getting started
+
+1. Install Lumen75. Installers (MSI and setup .exe) will be on the
+   [Releases](https://github.com/whiskey00/lumen75/releases) page. Until then,
+   [build it from source](#development).
+2. Close the official AULA app (`OemDrv.exe`), including from the tray.
+3. Connect the keyboard by cable, the 2.4G dongle or Bluetooth. For Bluetooth, pair
+   **"AULA-F75 5.0"** in Windows settings first.
+4. Open Lumen75. The welcome screen asks how the keyboard is connected. **Auto** works for most
+   people.
+5. Make a backup first: **Device → Back up**.
+
+## Supported keyboards
+
+### AULA F75
+
+The F75 has a switch on the back for three connections. Pick one in the header, or leave it on
+**Auto** (it tries the cable first). Your choice is saved.
+
+| Connection | USB ID | Status |
 | --- | --- | --- |
 | 2.4G dongle | `3554:FA09` | The most tested connection. Everything works. |
-| Bluetooth | `3554:FA07` (LE), `3554:FA08` (classic) | Pair **"AULA-F75 5.0"** in Windows Bluetooth settings. Reading the whole keyboard takes about 2 minutes, because many reply packets get lost over Bluetooth. So Lumen75 opens with what it last read (over any connection) and reads only what the page in front needs; the battery level comes from Windows. |
-| USB cable | `258A:010C` | Uses a different protocol. Lighting, device settings and streamed effects work. The rest isn't worked out yet. |
+| Bluetooth | `3554:FA07` (LE), `3554:FA08` (classic) | Works, but reads are slow (see below). |
+| USB cable | `258A:010C` | A different protocol. Lighting, device settings and streamed effects work. |
 
-## Features
-
-✅ works, tested on the keyboard · 🧪 built, not tested yet · ⚠️ works, with limits ·
+**Legend:** ✅ works, tested on the keyboard · 🧪 built, not tested yet · ⚠️ works, with limits ·
 ❌ not available yet · — doesn't apply
 
 | Feature | What it does | 2.4G | Bluetooth | Cable |
 | --- | --- | :-: | :-: | :-: |
 | **Lighting effects** | The 16 built-in effects, with brightness (0-9), speed (0-4) and colour | ✅ | 🧪 | ✅ |
-| **Custom colours** | Any RGB colour for an effect, and factory colours back with one click | ✅ | 🧪 | ❌ |
+| **Custom colours** | Any RGB colour for an effect, and the factory colours back with one click | ✅ | 🧪 | ❌ |
 | **Per-key colours** | Paint keys on a drawn keyboard (with groups like WASD, arrows and F-keys), and save layouts as presets | ✅ | 🧪 | ❌ |
-| **Key remapping** | Remap any key on the base or Fn layer to a key, a combo, a modifier or a macro, disable it, or reset it. Every change is read back and checked | ✅ | 🧪 | ❌ |
+| **Key remapping** | Remap any key on the base or Fn layer to a key, a combo, a modifier or a macro, disable it, or reset it | ✅ | 🧪 | ❌ |
 | **Macros** | Steps like `text:Hello`, `ctrl+c`, `wait:100`, stored on the keyboard. Run N times, while held, or until a key is pressed. Text is typed for your layout (US or Turkish Q) | ✅ | 🧪 | ❌ |
 | **Animations** | Stream, Breathing, Wave, Sparkle and Gradient in your own colours (1-7), with speed, brightness, direction and presets | ✅ | 🧪 | ✅ |
-| **Audio lighting** | The lights follow whatever your PC plays (Spectrum, Mirror, Ripple, Pulse), with gain, smoothness, rainbow or your own colours, presets and a choice of output device. No microphone needed | ✅ | 🧪 | ✅ |
-| **League of Legends lighting** | During a match: bars for health, mana, gold, level and respawn, a dead state, and effects for kills, objectives and the result. All customisable, with presets | 🧪 | — | 🧪 |
+| **Audio lighting** | Spectrum, Mirror, Ripple and Pulse, with gain, smoothness, rainbow or your own colours, presets and a choice of output device | ✅ | 🧪 | ✅ |
+| **League of Legends lighting** | Bars for health, mana, gold, level and respawn, a dead state, and effects for kills, objectives and the result. All customisable, with presets | 🧪 | — | 🧪 |
 | **Device settings** | Side light, knob mode, OS mode, Windows-key lock and sleep timer | ✅ | 🧪 | ✅ |
 | **Battery level** | Shown in the header | ⚠️ | ⚠️ | — |
 | **Backup and restore** | Saves and restores everything as hex files, compatible with `aula backup` / `aula restore` from aula-f75-hub | ✅ | ⚠️ | ❌ |
 | **Tray and Start with Windows** | Closing the window keeps the app in the tray (Open, Animation on/off, Quit). Starts hidden with Windows and resumes your last animation | ✅ | ✅ | ✅ |
 
-Notes:
+<details>
+<summary><b>Notes on streaming, battery, Bluetooth and League</b></summary>
 
 - **Animations, audio and League lighting stream from the app.** Nothing is stored on the
   keyboard, so they only run while Lumen75 is running (also from the tray). About 2 seconds
@@ -54,19 +112,24 @@ Notes:
   keyboard can sleep.
 - **Why stream at all?** The F75's own multicolour effects use a fixed rainbow and ignore the
   colour palettes (tested). Streaming is the only way to get animations in your own colours.
+- **Bluetooth reads are slow.** Reading the whole keyboard takes about 2 minutes, because many
+  reply packets get lost over Bluetooth. So Lumen75 opens with what it last read (over any
+  connection) and reads only what the page in front needs. The battery level comes from Windows.
 - **Battery** is experimental: it's the first byte of the keyboard's status reply, and it read
   100 at full charge. It hasn't been checked at lower charge.
 - **Backup over Bluetooth** works but takes a few minutes, for the slow reads.
 - **League lighting** uses only the match data League itself shares on your PC (Riot's Live
-  Client Data API). It doesn't read the game's memory or touch the game itself. It
-  can't show cooldowns, because League doesn't share them. It doesn't run over Bluetooth, which
-  is too slow for it. After a match it brings back your animation or audio lighting.
+  Client Data API). It doesn't read the game's memory or touch the game itself. It can't show
+  cooldowns, because League doesn't share them. It doesn't run over Bluetooth, which is too slow
+  for it. After a match it brings back your animation or audio lighting.
 
-## AULA S75 Pro
+</details>
 
-Lumen75 also supports the **AULA S75 Pro**, built from the protocol notes of
-[open-aula](https://github.com/paulcoding810/open-aula), and tested on a real S75 Pro: every
-feature below works. When an S75 Pro is connected (and no F75), the app switches to its pages.
+### AULA S75 Pro
+
+Built from the protocol notes of [open-aula](https://github.com/paulcoding810/open-aula) and
+tested on a real S75 Pro: every feature below works. When an S75 Pro is connected (and no F75),
+the app switches to its pages.
 
 | Feature | What it does | USB cable | 2.4G dongle |
 | --- | --- | :-: | :-: |
@@ -79,14 +142,13 @@ feature below works. When an S75 Pro is connected (and no F75), the app switches
 | **Settings** | Win, Alt+F4 and Alt+Tab locks, Fn layer mode, sleep, debounce | ✅ | ✅ |
 | **Battery** | Shown on the Device page | — | ✅ |
 
-Two things differ from the F75:
+> [!NOTE]
+> Two things differ from the F75. **There's no streamed lighting yet**: the S75 Pro's real-time
+> colour command isn't known, so Animations, Audio, Games and Discord don't work on it.
+> **Its settings can't be read back** (except per-key colours over USB), so its pages show what
+> Lumen75 last set.
 
-- **No streamed lighting.** The S75 Pro's real-time colour command isn't known yet, so
-  Animations, Audio, Games and Discord don't work on it.
-- **Settings can't be read back** (except per-key colours over USB), so the S75 Pro pages show
-  what Lumen75 last set.
-
-## Possible next features
+## Roadmap
 
 These are possible with what's known about the keyboard, but not built yet.
 
@@ -100,39 +162,15 @@ These are possible with what's known about the keyboard, but not built yet.
 | **More games** | Lighting for CS2 and Dota 2 | Valve's Game State Integration, which works like League's local data |
 | **Status lights** | Light a key for Caps Lock, a muted microphone or a new notification | Reading those states on Windows, on top of other lighting |
 | **Low-battery alert** | A notification before the keyboard runs out | Confirming the battery reading at low charge first |
-| **Other AULA keyboards** | Support for the F87, F99 and others (the S75 Pro is in) | Captures from those keyboards, or notes like open-aula's |
+| **Other AULA keyboards** | Support for the F87, F99 and others | Captures from those keyboards, or notes like open-aula's |
 | **Linux and macOS** | Lumen75 on other systems | A HID backend for each. The rest of the app is cross-platform |
 
 Not planned: firmware updates. Flashing the wrong firmware can brick the keyboard.
 
-## How it works
+## Development
 
-The Rust side (`src-tauri/src/`):
-
-- `protocol.rs`: the wireless packets (20-byte report `0x13`, 14-byte chunks, checksum), the
-  wired 520-byte feature reports, the 128-byte lighting and settings block, palettes, the
-  per-key table and keymap entries.
-- `device.rs`: reads (reassembled by packet index, with retries) and writes (each packet is
-  echoed back as an acknowledgement, with retries), with a pause after writes. Over the cable,
-  each write is read back to check it.
-- `win.rs`: finds the keyboard on each connection, does the Windows HID input and output, and
-  only talks to the keyboard while no key is held. Otherwise the keyboard can drop a key
-  release.
-- `audio.rs`: captures the PC's sound (WASAPI loopback), splits it into frequency bands with
-  automatic levels, and turns them into frames.
-- `anim.rs`: the animations as functions of time, and the streaming thread with idle pause.
-- `league.rs`, `gamelight.rs`, `match_watch.rs`: League's local match data, the game lighting,
-  and when to take over the keyboard and hand it back.
-- `app.rs`: saved settings and presets, tray, Start with Windows, single instance.
-- `s75/`: the AULA S75 Pro: its protocol, key layout, connection (USB and dongle), screen
-  images and the app's commands for it.
-- `macros.rs`, `keymap.rs`: the macro format, the step parser, the key layout and HID usages.
-
-The React side is in `src/`, with one file per page in `src/pages/`.
-
-## Develop
-
-You need Node.js, Rust and the Visual Studio C++ build tools.
+You need [Node.js](https://nodejs.org), [Rust](https://rustup.rs) and the
+[Visual Studio C++ build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
 
 ```bash
 npm install
@@ -146,7 +184,8 @@ cd src-tauri && cargo test
 ```
 
 The tests check packets against values captured from a real keyboard, round-trip the factory
-macro byte for byte, parse a real backup, and run sample League match data through the game lighting.
+macro byte for byte, parse a real backup, and run sample League match data through the game
+lighting.
 
 Build the installers (an MSI and an NSIS setup, in `src-tauri/target/release/bundle/`):
 
@@ -154,9 +193,31 @@ Build the installers (an MSI and an NSIS setup, in `src-tauri/target/release/bun
 npm run tauri build
 ```
 
+<details>
+<summary><b>Project layout</b></summary>
+
+The Rust side (`src-tauri/src/`):
+
+| File | What it does |
+| --- | --- |
+| `protocol.rs` | The wireless packets (20-byte report `0x13`, 14-byte chunks, checksum), the wired 520-byte feature reports, the 128-byte lighting and settings block, palettes, the per-key table and keymap entries |
+| `device.rs` | Reads (reassembled by packet index, with retries) and writes (each packet is echoed back as an acknowledgement, with retries), with a pause after writes. Over the cable, each write is read back to check it |
+| `win.rs` | Finds the keyboard on each connection, does the Windows HID input and output, and only talks to the keyboard while no key is held. Otherwise the keyboard can drop a key release |
+| `audio.rs` | Captures the PC's sound (WASAPI loopback), splits it into frequency bands with automatic levels, and turns them into frames |
+| `anim.rs` | The animations as functions of time, and the streaming thread with idle pause |
+| `league.rs`, `gamelight.rs`, `match_watch.rs` | League's local match data, the game lighting, and when to take over the keyboard and hand it back |
+| `app.rs` | Saved settings and presets, tray, Start with Windows, single instance |
+| `s75/` | The AULA S75 Pro: its protocol, key layout, connection (USB and dongle), screen images and the app's commands for it |
+| `macros.rs`, `keymap.rs` | The macro format, the step parser, the key layout and HID usages |
+
+The React side is in `src/`, with one file per page in `src/pages/`. The UI uses
+[shadcn/ui](https://ui.shadcn.com).
+
 The app icon is `app-icon.svg`. Regenerate every size with `npx tauri icon app-icon.svg`. The
 tray uses `tray-icon.svg`, a simpler version that stays readable at 16-24 px, rendered to
 `src-tauri/icons/tray.png` and `tray@2x.png`.
+
+</details>
 
 ## Credits
 
@@ -164,10 +225,11 @@ The protocol, effect numbers, key layout and macro format come from
 [aula-f75-hub](https://github.com/bakiakyol/aula-f75-hub) by Baki Akyol (MIT). Its Python code
 is ported to Rust here, and its factory table dumps are bundled in `src-tauri/factory/`. The
 wired real-time header follows
-[aula-f75-linux-drivers](https://github.com/cloudglides/aula-f75-linux-drivers). Details are in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[aula-f75-linux-drivers](https://github.com/cloudglides/aula-f75-linux-drivers). The S75 Pro
+protocol comes from the notes of [open-aula](https://github.com/paulcoding810/open-aula).
+Details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Built with AI assistance (Claude), then tested by hand on a real F75.
+Built with AI assistance (Claude), then tested by hand on real keyboards.
 
 ## Licence
 
@@ -176,9 +238,9 @@ MIT, see [LICENSE](LICENSE). The parts from aula-f75-hub stay under its MIT lice
 ## Disclaimer
 
 This is an unofficial, independent project. It isn't affiliated with, endorsed by or
-supported by AULA. AULA and F75 are trademarks of their owner and are used here only to say
-which keyboard this app works with. Use it at your own risk: it writes to the keyboard's
-settings, so make a backup first (Device → Backup).
+supported by AULA. AULA, F75 and S75 are trademarks of their owner and are used here only to
+say which keyboards this app works with. Use it at your own risk: it writes to the keyboard's
+settings, so make a backup first (**Device → Back up**).
 
 Lumen75 isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games
 or anyone officially involved in producing or managing Riot Games properties. Riot Games, and
